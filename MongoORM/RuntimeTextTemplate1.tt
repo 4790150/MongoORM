@@ -1,0 +1,234 @@
+﻿<#@ template debug="true" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="System.Xml" #>
+<#@ import namespace="System.Xml" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.IO" #>
+<#@ output extension=".cs" #>
+using System;
+using System.Collections.Generic;
+using System.Text;
+using Tests;
+namespace Tests2
+{
+    <#=Directory.GetCurrentDirectory()#>
+
+<#
+    var currDir = Directory.GetCurrentDirectory();
+    XmlDocument doc = new XmlDocument();
+    string path = "/MongoORM/Entity.xml";                
+    doc.Load(path);
+
+    List<string> listEntity = new List<string>();
+    foreach (XmlNode node in doc.SelectNodes("/Root/Entity"))
+    {
+        listEntity.Add(node.Attributes["Name"].InnerText);
+    }
+
+    foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
+    {
+        string className = node.Attributes["Name"].InnerText;
+        string primaryKey= node.HasAttribute("PrimaryKey") ? node.Attributes["PrimaryKey"].InnerText : null;
+
+        int propertyCount = node.SelectNodes("Property").Count;
+#>
+
+    public class <#=            className#>
+    {
+<#
+        int enablePropertyCount= propertyCount - (string.IsNullOrEmpty(primaryKey) ? 0 : 1);
+        for (int i = 0; i < (enablePropertyCount + 63)/64; i++)
+        {
+
+        }
+
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
+        {
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+            if ("Property" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+#>
+        private bool _<#=                    propertyName#>Dirty;
+        private <#=                    propertyType#> _<#=                    propertyName#>;
+        public <#=                    propertyType#> <#=                    propertyName#>
+        {
+            get => _<#=                    propertyName#>;
+            set
+            {
+                if (value == _<#=                    propertyName#>)
+                    return;
+
+                _<#=                    propertyName#> = value;
+                _<#=                    propertyName#>Dirty = true;
+            }
+        }
+<#            
+            }
+            else if ("List" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+                string listSize= nodeProperty.Attributes["Size"].InnerText;
+#>
+        public ListDocument<<#=                    propertyType#>> <#=                    propertyName#> = new ListDocument<<#=                    propertyType#>>();
+<#
+            }
+            else if ("Dict" == nodeProperty.Name)
+            {
+                string keyType= nodeProperty.Attributes["KeyType"].InnerText;
+                string valueType = nodeProperty.Attributes["ValueType"].InnerText;
+#>
+        public DictDocument<<#=                    keyType#>, <#=                    valueType#>> <#=                    propertyName#> = new DictDocument<<#=                    keyType#>, <#=                    valueType#>>();
+<#
+            }
+        }
+#>
+
+        public void ClearState()
+        {
+<#
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
+        {
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+            if ("Property" == nodeProperty.Name)
+            {
+#>
+            _<#=                    propertyName#>Dirty = false;
+<#            
+            }
+            else if ("List" == nodeProperty.Name || "Dict" == nodeProperty.Name)
+            {
+#>
+            <#=                    propertyName#>.ClearState();
+<#
+            }
+        }
+#>
+        }
+
+        public static implicit operator string(<#=className#> self)
+        {
+            return self.ToString();
+        }
+
+        public string ToString()
+        {
+            int count = 0;
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append("{");
+
+<#
+        int count = 0;
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
+        {
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+
+            if ("Property" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+#>
+            sb.Append($"<#=(0==count?"":",")#>'<#=propertyName#>':<#="string" == propertyType?"'":""#>{<#=propertyName#>}<#="string" == propertyType?"'":""#>");
+<#
+            }
+            else if ("List" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+#>
+
+            count = 0;
+            sb.Append("<#=(0==count?"":",")#><#=propertyName#>':[");
+            for (int i = 0; i < <#=propertyName#>.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+<#
+                if (listEntity.Contains(propertyType))
+                {
+#>
+                sb.Append(null == <#=propertyName#>[i] ? MongoSql.Null : <#=propertyName#>[i]);
+<#
+                }
+                else
+                {
+#>
+                sb.Append(<#=SystemTypeFormat(propertyType, propertyName)#>);
+<#
+                }
+#>
+            }
+<#
+            } 
+            else if ("Dict" == nodeProperty.Name)
+            {
+
+            }
+            count++;
+        }
+#>
+    }
+<#
+        //File.WriteAllText($"MongoORM/{className}.cs", sb.ToString());
+    }
+#>
+}
+<#+
+    public string SystemTypeFormat(string type, string name)
+    {
+        type = type.ToLower();
+
+            //switch (type.ToLower())
+            //{
+                //case "bool":
+                    //return Type.GetType("System.Boolean", true, true);
+                //case "byte":
+                    //return Type.GetType("System.Byte", true, true);
+                //case "sbyte":
+                    //return Type.GetType("System.SByte", true, true);
+                //case "char":
+                    //return Type.GetType("System.Char", true, true);
+                //case "decimal":
+                    //return Type.GetType("System.Decimal", true, true);
+                //case "double":
+                    //return Type.GetType("System.Double", true, true);
+                //case "float":
+                    //return Type.GetType("System.Single", true, true);
+                //case "int":
+                    //return Type.GetType("System.Int32", true, true);
+                //case "uint":
+                    //return Type.GetType("System.UInt32", true, true);
+                //case "long":
+                    //return Type.GetType("System.Int64", true, true);
+                //case "ulong":
+                    //return Type.GetType("System.UInt64", true, true);
+                //case "object":
+                    //return Type.GetType("System.Object", true, true);
+                //case "short":
+                    //return Type.GetType("System.Int16", true, true);
+                //case "ushort":
+                    //return Type.GetType("System.UInt16", true, true);
+                //case "string":
+                    //return Type.GetType("System.String", true, true);
+                //case "date":
+                //case "datetime":
+                    //return Type.GetType("System.DateTime", true, true);
+                //case "guid":
+                    //return Type.GetType("System.Guid", true, true);
+                //default:
+                    //return Type.GetType(type, true, true);
+            //}
+            //return $"'{name}'";
+            switch (type)
+            {
+                case "char":
+                    return "'{name}'";;
+                case "string":
+                case "datetime":
+                case "guid":
+                    return "'{name}'";
+                default:
+                    return "{name}";
+            }
+    }
+#>

@@ -1,0 +1,18 @@
+﻿
+
+using System;
+namespace Examples
+{
+    public class ExampleClass
+    {
+        #region Enums
+ 
+        public enum MyExampleEnum
+        {
+            Red,
+            Blue,
+        }
+        
+        #endregion
+    }
+}
