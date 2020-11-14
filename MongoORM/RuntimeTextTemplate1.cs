@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Test;
+using Tests;
 namespace Tests2
 {
-}

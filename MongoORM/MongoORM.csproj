@@ -30,15 +30,6 @@
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>RuntimeTextTemplate1.cs</LastGenOutput>
     </None>
-    <None Update="TextTemplate1.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>TextTemplate1.txt</LastGenOutput>
-    </None>
-    <None Update="TextTemplate1.txt">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>TextTemplate1.tt</DependentUpon>
-    </None>
   </ItemGroup>
 
   <ItemGroup>

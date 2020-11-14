@@ -1,4 +1,4 @@
-﻿<#@ template debug="true" hostspecific="false" language="C#" #>
+﻿<#@ template debug="true" hostspecific="True" language="C#" #>
 <#@ assembly name="System.Core" #>
 <#@ assembly name="System.Xml" #>
 <#@ import namespace="System.Xml" #>
@@ -7,15 +7,18 @@
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="System.IO" #>
 <#@ output extension=".cs" #>
+<#@include file="TemplateFileManager.ttinclude"#>
+<# var manager = Manager.Create(Host, GenerationEnvironment); #>
+<# manager.StartHeader(); #>
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Tests;
 namespace Tests2
 {
-    <#=Directory.GetCurrentDirectory()#>
-
 <#
+	manager.EndBlock();
+
     var currDir = Directory.GetCurrentDirectory();
     XmlDocument doc = new XmlDocument();
     string path = "/MongoORM/Entity.xml";                
@@ -33,6 +36,8 @@ namespace Tests2
         string primaryKey= node.HasAttribute("PrimaryKey") ? node.Attributes["PrimaryKey"].InnerText : null;
 
         int propertyCount = node.SelectNodes("Property").Count;
+
+		manager.StartNewFile(className+".cs");
 #>
 
     public class <#=            className#>
@@ -167,8 +172,10 @@ namespace Tests2
             count++;
         }
 #>
+		manager.EndBlock();
     }
 <#
+		manager.Process(true);
         //File.WriteAllText($"MongoORM/{className}.cs", sb.ToString());
     }
 #>
