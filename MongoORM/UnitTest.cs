@@ -121,7 +121,9 @@ namespace Test
             role.RoleName = "testName";
 
             role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Friends':{},'Items':{},'Texts':{},'Nums':{},'ListInt':[0,0],'ListStr':[null,null],'ListFriend':[null,null]}"), role.ToBsonDocument());
+            var actual = (BsonValue)role;
+            var expected = BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{},'Texts':{},'Items':{},'Friends':{},'ListInt':[],'ListStr':[],'ListFriend':[]}");
+            Assert.AreEqual(expected, (BsonDocument)(BsonValue)role);
         }
 
         [Test]
@@ -132,7 +134,7 @@ namespace Test
             role.RoleName = "testName";
             role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "friendName" });
 
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Friends':{'2':{'RoleID':2,'RoleName':'friendName'}},'Items':{},'Texts':{},'Nums':{},'ListInt':[0,0],'ListStr':[null,null],'ListFriend':[null,null]}"), role.ToBsonDocument());
+            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{},'Texts':{},'Items':{},'Friends':{'2':{'RoleID':2,'RoleName':'friendName'}},'ListInt':[],'ListStr':[],'ListFriend':[]}"), (BsonValue)role);
         }
 
         [Test]
@@ -143,7 +145,7 @@ namespace Test
             role.RoleName = "testName";
             role.Texts.Add(2, "friendName");
 
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Friends':{},'Items':{},'Texts':{'2':'friendName'},'Nums':{},'ListInt':[0,0],'ListStr':[null,null],'ListFriend':[null,null]}"), role.ToBsonDocument());
+            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{},'Texts':{'2':'friendName'},'Items':{},'Friends':{},'ListInt':[],'ListStr':[],'ListFriend':[]}"), (BsonValue)role);
         }
 
         [Test]
@@ -154,7 +156,7 @@ namespace Test
             role.RoleName = "testName";
             role.Nums.Add(2, 2);
 
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Friends':{},'Items':{},'Texts':{},'Nums':{'2':2},'ListInt':[0,0],'ListStr':[null,null],'ListFriend':[null,null]}"), role.ToBsonDocument());
+            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{'2':2},'Texts':{},'Items':{},'Friends':{},'ListInt':[],'ListStr':[],'ListFriend':[]}"), (BsonValue)role);
         }
 
         [Test]
@@ -179,6 +181,38 @@ namespace Test
             dict.SetState(1, UpdateState.Unset);
             dict.ClearState();
             Assert.AreEqual(1, dict.Count);
+        }
+
+        [Test]
+        public void BsonList_ToBsonValue()
+        {
+            BsonList<int> list = new BsonList<int> { 1, 2, 3 };
+            BsonValue actual = MongoUtility2.ToBsonValue(list);
+
+            var expected = new BsonDocument()
+            {
+                {"1", new BsonDocument{ { "PrevKey", 0 },{ "Value", 1} } },
+                {"2", new BsonDocument{ { "PrevKey", 1 },{ "Value", 2} }},
+                {"3", new BsonDocument{ { "PrevKey", 2 },{ "Value", 3} }}
+            };
+
+            Assert.AreEqual(expected, actual);
+        }
+
+        [Test]
+        public void BsonList_Parse()
+        {
+            var document = new BsonDocument()
+            {
+                {"1", new BsonDocument{ { "PrevKey", 0 },{ "Value", 1} } },
+                {"2", new BsonDocument{ { "PrevKey", 1 },{ "Value", 2} }},
+                {"3", new BsonDocument{ { "PrevKey", 2 },{ "Value", 3} }}
+            };
+
+            MongoUtility2.Parse(document, out BsonList<int> list);
+            Assert.AreEqual(1, list[0]);
+            Assert.AreEqual(2, list[1]);
+            Assert.AreEqual(3, list[2]);
         }
     }
 }

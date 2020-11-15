@@ -2,17 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Test;
 
-namespace Test
+namespace Test1
 {
-    public enum UpdateState : byte
-    {
-        None = 1,
-        Set = 1<<1,
-        Unset = 1<<2,
-        Push = 1<<3,
-    }
-
     class Friend
     {
         public long RoleID { get; set; }
@@ -145,7 +138,16 @@ namespace Test
             ListFriend.ClearState();
         }
 
-        public BsonDocument ToBsonDocument()
+        public static explicit operator Role(BsonValue value)
+        {
+            Role role = new Role();
+            var document = value.AsBsonDocument;
+            role.RoleID = (long)document["RoleID"];
+            role._RoleName = (string)document["RoleName"];
+            return role;
+        }
+
+        public BsonValue ToBsonValue()
         {
             BsonDocument sb = new BsonDocument();
             sb.Add("RoleID", RoleID);

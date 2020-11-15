@@ -1,22 +1,72 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Test
 {
-    public class BsonList<T> : IList<T>
+    public struct BsonListElement<T>
     {
-        struct Element
+        public BsonListElement(int key, T element)
         {
-            public int Key;
-            public bool Pushed;
-            public int Next;
+            this.Key = key;
+            this._PrevKey = 0;
+            this._PrevKeyDirty = false;
+            this._Element = element;
+            this._ElementDirty = false;
         }
 
-        public bool NewDocument { get; set; }
-        List<T> ItemList;
-        Link<Element> Keys;
+        public BsonListElement(int key, int prevKey, T element)
+        {
+            this.Key = key;
+            this._PrevKey = prevKey;
+            this._PrevKeyDirty = false;
+            this._Element = element;
+            this._ElementDirty = false;
+        }
+
+        public int Key { get; internal set; }
+
+        private bool _PrevKeyDirty;
+        private int _PrevKey;
+        public int PrevKey
+        {
+            get => _PrevKey;
+            set
+            {
+                if (value == _PrevKey)
+                    return;
+
+                _PrevKey = value;
+                _PrevKeyDirty = true;
+            }
+        }
+
+        private bool _ElementDirty;
+        private T _Element;
+        public T Element
+        {
+            get => _Element;
+            set
+            {
+                if (value.Equals(_Element))
+                    return;
+
+                _Element = value;
+                _ElementDirty = true;
+            }
+        }
+
+        public bool Dirty { get => _ElementDirty; set => _ElementDirty = value; }
+    }
+
+    public class BsonList<T> : IList<T>
+    {
+        internal List<BsonListElement<T>> ItemList;
+        internal List<BsonListElement<T>> RemovedList;
+
+        private int KeySeed = 1;
 
         public BsonList() : this(4)
         {
@@ -29,86 +79,143 @@ namespace Test
             foreach (var item in collection)
                 count++;
 
-            ItemList = new List<T>(count);
-            Keys = new List<Element>(count);
-            NewDocument = true;
+            ItemList = new List<BsonListElement<T>>(count);
+            RemovedList = new List<BsonListElement<T>>();
 
             foreach (var item in collection)
             {
-                ItemList.Add(item);
-                Keys.Add();
+                ItemList.Add(new BsonListElement<T>(KeySeed++, ItemList.Count > 0 ? ItemList.Count : 0, item));
             }
+            ClearState();
         }
 
         public BsonList(int capacity)
         {
-            ItemList = new List<T>(capacity);
-            Keys = new List<int>(capacity);
-            States = new List<bool>(capacity);
-            NewDocument = true;
+            ItemList = new List<BsonListElement<T>>(capacity);
+            RemovedList = new List<BsonListElement<T>>(capacity);
         }
 
         public T this[int index]
         {
             get
             {
-                return ItemList[index];
+                return ItemList[index].Element;
             }
 
             set
             {
-                ItemList[index] = value;
-                States[index] = true;
+                var item = ItemList[index];
+                item.Element = value;
+                ItemList[index] = item;
             }
         }
 
         public int Count { get => ItemList.Count; }
-        public int Capacity { get => ItemList.Capacity; }
 
         public bool IsReadOnly => false;
 
-        public static sbyte[] GenerateKey(sbyte[] prev, sbyte[] next)
-        {
-            List<sbyte> result = new List<sbyte>();
-            int length = Math.Max(prev.Length, next.Length);
-            for (int i = 0; i < length; i++)
-            {
-                int prevValue = i < prev.Length ? prev[i] : sbyte.MinValue - 1;
-                int nextValue = i < next.Length ? next[i] : sbyte.MaxValue + 1;
-
-                int newValue = (prevValue + nextValue) / 2;
-                if (newValue + 1 >= nextValue)
-                {
-                    result.Add((sbyte)Math.Max(prevValue, sbyte.MinValue));
-                }
-                else
-                {
-                    result.Add((sbyte)((prevValue + nextValue) / 2));
-                    return result.ToArray();
-                }
-
-            }
-            result.Add(0);
-            return result.ToArray();
-        }
-
         public void Add(T item)
         {
-            ItemList.Add(item);
-
-            int index = ItemList.Count - 1;
-            Keys.Add(  );
-            States.Add(true);
+            ItemList.Add(new BsonListElement<T>(KeySeed++, ItemList.Count > 0 ? ItemList[ItemList.Count - 1].Key : 0, item));
         }
 
         public void Clear()
         {
-            NewDocument = true;
+            foreach (var element in ItemList)
+            {
+                if (!element.Dirty)
+                {
+                    RemovedList.Add(element);
+                }
+            }
+            ItemList.Clear();
+        }
+
+        public void ClearState()
+        {
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                var item = ItemList[i];
+                ItemList[i] = new BsonListElement<T>(item.Key, item.PrevKey, item.Element);
+            }
+        }
+
+        public bool IsModifyed(int index)
+        {
+            return ItemList[index].Dirty;
         }
 
         public bool Contains(T item)
         {
-            throw new NotImplementedException();
+            foreach (var element in ItemList)
+            {
+                if (element.Element.Equals(item))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public int IndexOf(T item)
+        {
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                if (ItemList[i].Element.Equals(item))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        public void Insert(int index, T item)
+        {
+            ItemList.Insert(index, new BsonListElement<T>(KeySeed++, index > 0 ? ItemList[index - 1].Key : 0, item));
+        }
+
+        public bool Remove(T item)
+        {
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                var element = ItemList[i];
+                if (element.Element.Equals(item))
+                {
+                    if (!element.Dirty)
+                    {
+                        RemovedList.Add(element);
+                    }
+                    ItemList.RemoveAt(i);
+
+                    if (i < ItemList.Count)
+                    {
+                        var next = ItemList[i];
+                        next.PrevKey = i > 0 ? ItemList[i - 1].Key : 0;
+                    }
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void RemoveAt(int index)
+        {
+            var element = ItemList[index];
+            if (!element.Dirty)
+            {
+                RemovedList.Add(ItemList[index]);
+            }
+            ItemList.RemoveAt(index);
+
+            if (index < ItemList.Count)
+            {
+                var next = ItemList[index];
+                next.PrevKey = index > 0 ? ItemList[index - 1].Key : 0;
+            }
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            return new Enumerator(this);
         }
 
         public void CopyTo(T[] array, int arrayIndex)
@@ -116,34 +223,38 @@ namespace Test
             throw new NotImplementedException();
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            throw new NotImplementedException();
-        }
-
-        public int IndexOf(T item)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Insert(int index, T item)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool Remove(T item)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RemoveAt(int index)
-        {
-            throw new NotImplementedException();
-        }
-
         IEnumerator IEnumerable.GetEnumerator()
         {
-            throw new NotImplementedException();
+            return new Enumerator(this);
+        }
+
+        public class Enumerator : IEnumerator<T>
+        {
+            int Index = -1;
+            BsonList<T> List;
+
+            public Enumerator(BsonList<T> list)
+            {
+                this.List = list;
+            }
+
+            public T Current => List[Index];
+
+            object IEnumerator.Current => List[Index];
+
+            public void Dispose()
+            {
+            }
+
+            public bool MoveNext()
+            {
+                return ++Index < List.Count;
+            }
+
+            public void Reset()
+            {
+                Index = -1;
+            }
         }
     }
 }

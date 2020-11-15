@@ -30,7 +30,6 @@ class Manager {
     private Block header = new Block();
     private ITextTemplatingEngineHost host;
     private StringBuilder template;
-    protected List<String> generatedFileNames = new List<String>();
 
     public static Manager Create(ITextTemplatingEngineHost host, StringBuilder template) {
         return (host is IServiceProvider) ? new VSManager(host, template) : new Manager(host, template);
@@ -59,11 +58,13 @@ class Manager {
         currentBlock = null;
     }
 
-    public virtual void Process(bool split) {
+    public virtual IEnumerable<string> Process(bool split) {
+        var generatedFileNames = new List<string>();
         if (split) {
             EndBlock();
             String headerText = template.ToString(header.Start, header.Length);
             String footerText = template.ToString(footer.Start, footer.Length);
+            template.Remove(footer.Start, footer.Length);
             String outputPath = Path.GetDirectoryName(host.TemplateFile);
             files.Reverse();
             foreach(Block block in files) {
@@ -73,20 +74,15 @@ class Manager {
                 CreateFile(fileName, content);
                 template.Remove(block.Start, block.Length);
             }
+            template.Remove(header.Start, header.Length);
         }
+
+        return generatedFileNames;
     }
 
     protected virtual void CreateFile(String fileName, String content) {
         if (IsFileContentDifferent(fileName, content))
             File.WriteAllText(fileName, content);
-    }
-
-    public virtual String GetCustomToolNamespace(String fileName) {
-        return null;
-    }
-
-    public virtual String DefaultProjectNamespace {
-        get { return null; }
     }
 
     protected bool IsFileContentDifferent(String fileName, String newContent) {
@@ -113,23 +109,14 @@ class Manager {
         private EnvDTE.ProjectItem templateProjectItem;
         private EnvDTE.DTE dte;
         private Action<String> checkOutAction;
-        private Action<IEnumerable<String>> projectSyncAction;
+        private Action<IEnumerable<string>> projectSyncAction;
 
-        public override String DefaultProjectNamespace {
-            get {
-                return templateProjectItem.ContainingProject.Properties.Item("DefaultNamespace").Value.ToString();
-            }
-        }
-
-        public override String GetCustomToolNamespace(string fileName) {
-            return dte.Solution.FindProjectItem(fileName).Properties.Item("CustomToolNamespace").Value.ToString();
-        }
-
-        public override void Process(bool split) {
+        public override IEnumerable<string> Process(bool split) {
             if (templateProjectItem.ProjectItems == null)
-                return;
-            base.Process(split);
-            projectSyncAction.EndInvoke(projectSyncAction.BeginInvoke(generatedFileNames, null, null));
+                return new List<string>();
+            var generatedFileNames = base.Process(split);
+            projectSyncAction.Invoke(generatedFileNames);
+            return generatedFileNames;
         }
 
         protected override void CreateFile(String fileName, String content) {
@@ -173,7 +160,7 @@ class Manager {
         private void CheckoutFileIfRequired(String fileName) {
             var sc = dte.SourceControl;
             if (sc != null && sc.IsItemUnderSCC(fileName) && !sc.IsItemCheckedOut(fileName))
-                checkOutAction.EndInvoke(checkOutAction.BeginInvoke(fileName, null, null));
+                checkOutAction.Invoke(fileName);
         }
     }
 } #>

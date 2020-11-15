@@ -1,13 +1,14 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Test
 {
-    public class BsonDictionary<K, V>
+    public class BsonDictionary<TKey, TValue> 
     {
-        private Dictionary<K, UpdateState> States = new Dictionary<K, UpdateState>();
-        private Dictionary<K, V> Items = new Dictionary<K, V>();
+        private Dictionary<TKey, UpdateState> States = new Dictionary<TKey, UpdateState>();
+        private Dictionary<TKey, TValue> Items = new Dictionary<TKey, TValue>();
 
         public int Count { get; protected set; }
 
@@ -24,7 +25,7 @@ namespace Test
             Count = 0;
         }
 
-        public V this[K key]
+        public TValue this[TKey key]
         {
             get
             {
@@ -40,18 +41,18 @@ namespace Test
             }
         }
 
-        public bool TryGetValue(K key, out V value)
+        public bool TryGetValue(TKey key, out TValue value)
         {
             return Items.TryGetValue(key, out value);
         }
 
-        public bool TryGetValue(K key, out V value, out UpdateState state)
+        public bool TryGetValue(TKey key, out TValue value, out UpdateState state)
         {
             States.TryGetValue(key, out state);
             return Items.TryGetValue(key, out value);
         }
 
-        public void Add(K key, V value, bool dbReplicated = false)
+        public void Add(TKey key, TValue value, bool dbReplicated = false)
         {
             if (!Items.ContainsKey(key))
                 Count++;
@@ -67,9 +68,9 @@ namespace Test
             }
         }
 
-        public bool Remove(K key)
+        public bool Remove(TKey key)
         {
-            if (!Items.TryGetValue(key, out V value))
+            if (!Items.TryGetValue(key, out TValue value))
                 return false;
 
             Count--;
@@ -88,7 +89,7 @@ namespace Test
             return true;
         }
 
-        public void Foreach(UpdateState filter, Action<K, V, UpdateState> action)
+        public void Foreach(UpdateState filter, Action<TKey, TValue, UpdateState> action)
         {
             foreach (var pair in Items)
             {
@@ -100,7 +101,7 @@ namespace Test
             }
         }
 
-        public void SetState(K key, UpdateState state)
+        public void SetState(TKey key, UpdateState state)
         {
             if (!Items.ContainsKey(key))
                 return;

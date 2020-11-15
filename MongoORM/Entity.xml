@@ -7,7 +7,7 @@
   <Entity Name="Item" PrimaryKey="ItemUID">
     <Property Name="ItemUID" Type="int"/>
     <Property Name="ItemID" Type="int"/>
-    <List Name="Stones" Type="int" Size="4"/>
+    <List Name="Stones" Type="int"/>
   </Entity>
   <Entity Name="Role" PrimaryKey="RoleID">
     <Property Name="RoleID" Type="long"/>
@@ -16,8 +16,8 @@
     <Dict Name="Texts" KeyType="int" ValueType="string"/>
     <Dict Name="Items" KeyType="int" ValueType="Item"/>
     <Dict Name="Friends" KeyType="long" ValueType="Friend"/>
-    <List Name="ListInt" Type="int" Size="2"/>
-    <List Name="ListStr" Type="string" Size="2"/>
-    <List Name="ListFriend" Type="Friend" Size="2"/>
+    <List Name="ListInt" Type="int"/>
+    <List Name="ListStr" Type="string"/>
+    <List Name="ListFriend" Type="Friend"/>
   </Entity>
 </Root>
