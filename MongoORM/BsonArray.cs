@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Test
+namespace MongoORM
 {
     public class BsonArray<T> : IEnumerable<T>, IEnumerable
     {

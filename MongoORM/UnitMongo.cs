@@ -1,6 +1,7 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
+using MongoORM;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -607,7 +608,7 @@ namespace Test
                 Roles.Add(i, role);
             }
 
-            MongoContext context = new MongoContext();
+            BulkWriteContext context = new BulkWriteContext();
             foreach (var pair in Roles)
             {
                 context.Insert((BsonDocument)pair.Value);
@@ -630,7 +631,8 @@ namespace Test
                 Roles.Add(i, role);
             }
 
-            MongoContext context = new MongoContext();
+            UpdateContext update = new UpdateContext();
+            BulkWriteContext context = new BulkWriteContext();
             foreach (var pair in Roles)
             {
                 if (pair.Value.Inserted)
@@ -639,14 +641,15 @@ namespace Test
                 }
                 else
                 {
-                    context.UpdateContext.Clear();
-                    pair.Value.Update(context.UpdateContext);
-                    context.Build(new BsonDocument { { "_id", pair.Key } });
+                    update.Clear();
+                    pair.Value.Update(update);
+                    context.Update(new BsonDocument { { "_id", pair.Key } }, update.Build());
                 }
                 pair.Value.ClearDirty();
                 pair.Value.Inserted = false;
             }
             context.Execute(collection);
+            update.Clear();
             context.Clear();
 
             for (int i = 0; i < 100; i++)
@@ -664,14 +667,15 @@ namespace Test
                 }
                 else
                 {
-                    context.UpdateContext.Clear();
-                    pair.Value.Update(context.UpdateContext);
-                    context.Build(new BsonDocument { { "_id", pair.Key } });
+                    update.Clear();
+                    pair.Value.Update(update);
+                    context.Update(new BsonDocument { { "_id", pair.Key } }, update.Build());
                 }
                 pair.Value.ClearDirty();
                 pair.Value.Inserted = false;
             }
             context.Execute(collection);
+            update.Clear();
             context.Clear();
         }
     }

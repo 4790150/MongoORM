@@ -4,7 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Test
+namespace MongoORM
 {
     public class BsonDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     {

@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using MongoORM;
 using NUnit.Framework;
 
 namespace Test

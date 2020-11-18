@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Test
+namespace MongoORM
 {
     public class UpdateContext
     {
@@ -36,32 +36,27 @@ namespace Test
         }
     }
 
-    public class MongoContext
+    public class BulkWriteContext
     {
-        public UpdateContext UpdateContext = new UpdateContext();
-
         List<BsonDocument> Inserts = new List<BsonDocument>();
         Dictionary<BsonDocument, BsonDocument> Updates = new Dictionary<BsonDocument, BsonDocument>();
 
         public void Clear()
         {
-            UpdateContext.Clear();
             Inserts.Clear();
             Updates.Clear();
         }
 
-        public void Insert(BsonDocument doucment)
+        public void Insert(BsonDocument document)
         {
-            Inserts.Add(doucment);
+            if (document.ElementCount > 0)
+                Inserts.Add(document);
         }
 
-        public BsonDocument Build(BsonDocument filter)
+        public void Update(BsonDocument filter, BsonDocument update)
         {
-            var bsonDoc = UpdateContext.Build();
-            if (bsonDoc.ElementCount > 0)
-                Updates[filter] = bsonDoc;
-
-            return bsonDoc;
+            if (update.ElementCount > 0)
+                Updates[filter] = update;
         }
 
         public void Execute(IMongoCollection<BsonDocument> collection)
@@ -94,7 +89,6 @@ namespace Test
                 }
             }
 
-            UpdateContext.Clear();
             Inserts.Clear();
             Updates.Clear();
         }

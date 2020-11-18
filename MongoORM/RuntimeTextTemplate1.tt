@@ -26,6 +26,7 @@
     entityMgr.StartHeader();
 #>
 using MongoDB.Bson;
+using MongoORM;
 using System;
 
 namespace <#=Namespace#>
