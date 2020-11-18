@@ -275,7 +275,7 @@ namespace Test
             return item;
         }
 
-        public void Update(MongoContext context, string path = null)
+        public void Update(UpdateContext context, string path = null)
         {
             if (_RoleNameDirty)
             {

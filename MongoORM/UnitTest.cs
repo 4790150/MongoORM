@@ -5,7 +5,7 @@ namespace Test
 {
     public class UnitTest
     {
-        MongoContext context = new MongoContext();
+        UpdateContext context = new UpdateContext();
 
         Role CreateRole()
         {

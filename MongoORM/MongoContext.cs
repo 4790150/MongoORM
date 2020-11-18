@@ -1,11 +1,12 @@
 ﻿using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Test
 {
-    public class MongoContext
+    public class UpdateContext
     {
         public BsonDocument Bson = new BsonDocument();
         public BsonDocument Set = new BsonDocument();
@@ -32,6 +33,70 @@ namespace Test
                 Bson.Add("$unset", Unset);
             }
             return Bson;
+        }
+    }
+
+    public class MongoContext
+    {
+        public UpdateContext UpdateContext = new UpdateContext();
+
+        List<BsonDocument> Inserts = new List<BsonDocument>();
+        Dictionary<BsonDocument, BsonDocument> Updates = new Dictionary<BsonDocument, BsonDocument>();
+
+        public void Clear()
+        {
+            UpdateContext.Clear();
+            Inserts.Clear();
+            Updates.Clear();
+        }
+
+        public void Insert(BsonDocument doucment)
+        {
+            Inserts.Add(doucment);
+        }
+
+        public BsonDocument Build(BsonDocument filter)
+        {
+            var bsonDoc = UpdateContext.Build();
+            if (bsonDoc.ElementCount > 0)
+                Updates[filter] = bsonDoc;
+
+            return bsonDoc;
+        }
+
+        public void Execute(IMongoCollection<BsonDocument> collection)
+        {
+            if (Inserts.Count > 1 && 0 == Updates.Count) // InsertMany
+            {
+                collection.InsertMany(Inserts);
+            }
+            else if (Inserts.Count + Updates.Count > 1)  // BulkWrite
+            {
+                var writeModels = new List<WriteModel<BsonDocument>>(Inserts.Count + Updates.Count);
+                foreach (var insertDoc in Inserts)
+                    writeModels.Add(new InsertOneModel<BsonDocument>(insertDoc));
+                foreach (var pair in Updates)
+                    writeModels.Add(new UpdateOneModel<BsonDocument>(pair.Key, pair.Value));
+
+                collection.BulkWrite(writeModels);
+            }
+            else
+            {
+                if (1 == Inserts.Count)
+                {
+                    collection.InsertOne(Inserts[0]);
+                }
+                else if (1 == Updates.Count)
+                {
+                    var enumerator = Updates.GetEnumerator();
+                    if (enumerator.MoveNext())
+                        collection.UpdateOne(enumerator.Current.Key, enumerator.Current.Value);
+                }
+            }
+
+            UpdateContext.Clear();
+            Inserts.Clear();
+            Updates.Clear();
         }
     }
 }

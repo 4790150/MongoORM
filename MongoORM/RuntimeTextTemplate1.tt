@@ -363,7 +363,7 @@ namespace <#=Namespace#>
             return item;
         }
 
-        public void Update(MongoContext context, string path = null)
+        public void Update(UpdateContext context, string path = null)
         {
 <#
         foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
