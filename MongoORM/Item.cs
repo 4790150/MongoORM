@@ -1,11 +1,9 @@
 using MongoDB.Bson;
 using System;
-using Test;
 
 namespace Test
 {
-
-    public class Item
+    public partial class Item
     {
         public int ItemUID { get; set; }
 
@@ -30,7 +28,7 @@ namespace Test
             get
             {
                 if (_ItemIDDirty) return true;
-                foreach (var item in Stones.ItemList)
+                foreach (var item in Stones.internalItems)
                 {
                     if (item.DataDirty)
                         return true;
@@ -68,7 +66,7 @@ namespace Test
                 BsonDocument bsonStones = new BsonDocument();
                 for (int i = 0; i < item.Stones.Count; i++)
                 {
-                    var value = item.Stones.ItemList[i];
+                    var value = item.Stones.internalItems[i];
                     BsonDocument valueDoc = new BsonDocument();
                     valueDoc["PrevKey"] = value.PrevKey;
                     valueDoc["Value"] = (BsonValue)value.Value;
@@ -104,16 +102,16 @@ namespace Test
                             int key = int.Parse(pair.Name);
                             int prevKey = (int)valueDoc["PrevKey"];
                             int element = (int)valueDoc["Value"];
-                            item.Stones.Add(new BsonList<int>.Element(key, prevKey, element));
+                            item.Stones.internalAdd(new BsonList<int>.Element(key, prevKey, element));
                         }
-                        item.Stones.PostDeserialize();
+                        item.Stones.internalPostDeserialize();
                         break;
                 }
             }
             return item;
         }
 
-        public void Save(string path, MongoContext context)
+        public void Update(MongoContext context, string path = null)
         {
             if (_ItemIDDirty)
             {
@@ -123,17 +121,17 @@ namespace Test
                     context.Set.Add($"{path}ItemID", _ItemID);
             }
 
-            if (0 == Stones.Count && Stones.Removed.Count > 0)
+            if (0 == Stones.Count && Stones.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}Stones", 1);
             }
             else
             {
-                foreach (var key in Stones.Removed)
+                foreach (var key in Stones.internalRemoved)
                 {
                     context.Unset.Add($"{path}Stones.{key}", 1);
                 }
-                foreach (var element in Stones.ItemList)
+                foreach (var element in Stones.internalItems)
                 {
                     if (element.NewData)
                     {

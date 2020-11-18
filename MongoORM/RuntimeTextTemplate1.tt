@@ -9,58 +9,57 @@
 <#@ output extension=".cs" #>
 <#@ include file="TemplateFileManager.ttinclude"#>
 <#
-var entityMgr = Manager.Create(Host, GenerationEnvironment);
+    var currDir = Directory.GetCurrentDirectory();
+    XmlDocument doc = new XmlDocument();
+    string path = Path.Combine(currDir, "MongoORM/Entity.xml");
+    doc.Load(path);
 
+    List<string> listEntity = new List<string>();
+    foreach (XmlNode node in doc.SelectNodes("/Root/Entity"))
+    {
+        listEntity.Add(node.Attributes["Name"].InnerText);
+    }
 
-entityMgr.StartHeader();
+    string Namespace = doc.SelectSingleNode("/Root").Attributes["Namespace"].InnerText;
+
+    var entityMgr = Manager.Create(Host, GenerationEnvironment);
+    entityMgr.StartHeader();
 #>
 using MongoDB.Bson;
 using System;
-using Test;
 
-namespace Test
+namespace <#=Namespace#>
 {
 <#
-entityMgr.EndBlock();
-var currDir = Directory.GetCurrentDirectory();
-XmlDocument doc = new XmlDocument();
-string path = Path.Combine(currDir, "MongoORM/Entity.xml");
-doc.Load(path);
+    entityMgr.EndBlock();
 
-List<string> listEntity = new List<string>();
-foreach (XmlNode node in doc.SelectNodes("/Root/Entity"))
-{
-    listEntity.Add(node.Attributes["Name"].InnerText);
-}
+    foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
+    {
+        string className = node.Attributes["Name"].InnerText;
+        string primaryKey= node.HasAttribute("PrimaryKey") ? node.Attributes["PrimaryKey"].InnerText : null;
 
-foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
-{
-    string className = node.Attributes["Name"].InnerText;
-    string primaryKey= node.HasAttribute("PrimaryKey") ? node.Attributes["PrimaryKey"].InnerText : null;
+        int propertyCount = node.SelectNodes("Property").Count;
 
-    int propertyCount = node.SelectNodes("Property").Count;
-
-	entityMgr.StartNewFile(className+".cs");
+	    entityMgr.StartNewFile(className+".cs");
 #>
-
-    public class <#=className#>
+    public partial class <#=className#>
     {
 <#
-    foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
-    {
-        string propertyName = nodeProperty.Attributes["Name"].InnerText;
-        if ("Property" == nodeProperty.Name)
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
         {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
-            if (propertyName == primaryKey)
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+            if ("Property" == nodeProperty.Name)
             {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+                if (propertyName == primaryKey)
+                {
 #>
         public <#=propertyType#> <#=propertyName#> { get; set; }
 
 <#
-            }
-            else
-            {
+                }
+                else
+                {
 #>
         private bool _<#=propertyName#>Dirty;
         private <#=propertyType#> _<#=propertyName#>;
@@ -77,24 +76,24 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
             }
         }
 <#           
-            }    
-        }
-        else if ("List" == nodeProperty.Name)
-        {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
+                }    
+            }
+            else if ("List" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
 #>
         public readonly BsonList<<#=propertyType#>> <#=propertyName#> = new BsonList<<#=propertyType#>>();
 <#
-        }
-        else if ("Dict" == nodeProperty.Name)
-        {
-            string keyType= nodeProperty.Attributes["KeyType"].InnerText;
-            string valueType = nodeProperty.Attributes["ValueType"].InnerText;
+            }
+            else if ("Dict" == nodeProperty.Name)
+            {
+                string keyType= nodeProperty.Attributes["KeyType"].InnerText;
+                string valueType = nodeProperty.Attributes["ValueType"].InnerText;
 #>
         public readonly BsonDictionary<<#=keyType#>, <#=valueType#>> <#=propertyName#> = new BsonDictionary<<#=keyType#>, <#=valueType#>>();
 <#
+            }
         }
-    }
 #>
 
         public bool DataDirty
@@ -102,7 +101,7 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
             get
             {
 <#
-    foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
         {
             string propertyName = nodeProperty.Attributes["Name"].InnerText;
             if ("Property" == nodeProperty.Name)
@@ -117,7 +116,7 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
             {
                 string propertyType = nodeProperty.Attributes["Type"].InnerText;
 #>
-                foreach (var item in <#=propertyName#>.ItemList)
+                foreach (var item in <#=propertyName#>.internalItems)
                 {
                     if (item.DataDirty)
                         return true;
@@ -138,7 +137,7 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 string keyType= nodeProperty.Attributes["KeyType"].InnerText;
                 string valueType = nodeProperty.Attributes["ValueType"].InnerText;
 #>
-                if (<#=propertyName#>.Added.Count > 0 || <#=propertyName#>.Removed.Count > 0) return true;
+                if (<#=propertyName#>.internalAdded.Count > 0 || <#=propertyName#>.internalRemoved.Count > 0) return true;
 <#
                 if (listEntity.Contains(valueType))
                 {
@@ -150,8 +149,6 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 }
 <#
                 }
-#>
-<#
             }
         }
 #>
@@ -162,46 +159,46 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
         public void ClearDirty()
         {
 <#
-    foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
-    {
-        string propertyName = nodeProperty.Attributes["Name"].InnerText;
-        if ("Property" == nodeProperty.Name)
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
         {
-            if (propertyName == primaryKey)
-                continue;
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+            if ("Property" == nodeProperty.Name)
+            {
+                if (propertyName == primaryKey)
+                    continue;
 #>
             _<#=propertyName#>Dirty = false;
 <#            
-        }
-        else if ("List" == nodeProperty.Name)
-        {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
+            }
+            else if ("List" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
 #>
             <#=propertyName#>.ClearDirty();
 <#
-            if (listEntity.Contains(propertyType))
-            {
+                if (listEntity.Contains(propertyType))
+                {
 #>
             foreach (var item in <#=propertyName#>)
                 item?.ClearDirty();
 <#
+                }
             }
-        }
-        else if ("Dict" == nodeProperty.Name)
-        {
-            string propertyType = nodeProperty.Attributes["ValueType"].InnerText;
+            else if ("Dict" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["ValueType"].InnerText;
 #>
             <#=propertyName#>.ClearDirty();
 <#
-            if (listEntity.Contains(propertyType))
-            {
+                if (listEntity.Contains(propertyType))
+                {
 #>
             foreach (var pair in <#=propertyName#>)
                 pair.Value?.ClearDirty();
 <#
+                }
             }
         }
-    }
 #>
         }
 
@@ -220,30 +217,30 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
 
             BsonDocument document = new BsonDocument();
 <#
-    foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
-    {
-        string propertyName = nodeProperty.Attributes["Name"].InnerText;
-
-        if ("Property" == nodeProperty.Name)
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
         {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
-            if (propertyName == primaryKey)
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+
+            if ("Property" == nodeProperty.Name)
             {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+                if (propertyName == primaryKey)
+                {
 #>
             document.Add("_id", item.<#=propertyName#>);
 <#
-            }
-            else
-            {
+                }
+                else
+                {
 #>
             if (default(<#=propertyType#>) != item._<#=propertyName#>)
                 document.Add("<#=propertyName#>", item._<#=propertyName#>);
 <#
+                }
             }
-        }
-        else if ("List" == nodeProperty.Name)
-        {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
+            else if ("List" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
 #>
 
             if (item.<#=propertyName#>.Count > 0)
@@ -251,7 +248,7 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 BsonDocument bson<#=propertyName#> = new BsonDocument();
                 for (int i = 0; i < item.<#=propertyName#>.Count; i++)
                 {
-                    var value = item.<#=propertyName#>.ItemList[i];
+                    var value = item.<#=propertyName#>.internalItems[i];
                     BsonDocument valueDoc = new BsonDocument();
                     valueDoc["PrevKey"] = value.PrevKey;
                     valueDoc["Value"] = (BsonValue)value.Value;
@@ -260,10 +257,10 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 document.Add("<#=propertyName#>", bson<#=propertyName#>);
             }
 <#
-        } 
-        else if ("Dict" == nodeProperty.Name)
-        {
-            string valueType = nodeProperty.Attributes["ValueType"].InnerText;
+            } 
+            else if ("Dict" == nodeProperty.Name)
+            {
+                string valueType = nodeProperty.Attributes["ValueType"].InnerText;
 #>
 
             if (item.<#=propertyName#>.Count > 0)
@@ -274,8 +271,8 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 document.Add("<#=propertyName#>", bson<#=propertyName#>);
             }
 <#
+            }
         }
-    }
 #>
             return document;
         }
@@ -296,29 +293,29 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 switch(field.Name)
                 {
 <#
-    foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
-    {
-        string propertyName = nodeProperty.Attributes["Name"].InnerText;
-
-        if ("Property" == nodeProperty.Name)
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
         {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
-            if (propertyName == primaryKey)
+            string propertyName = nodeProperty.Attributes["Name"].InnerText;
+
+            if ("Property" == nodeProperty.Name)
             {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
+                if (propertyName == primaryKey)
+                {
 #>
                     case "_id": item.<#=propertyName#> = (<#=propertyType#>)field.Value; break;
 <#
-            }
-            else
-            {
+                }
+                else
+                {
 #>
                     case "<#=propertyName#>": item._<#=propertyName#> = (<#=propertyType#>)field.Value; break;
 <#
+                }
             }
-        }
-        else if ("List" == nodeProperty.Name)
-        {
-            string propertyType = nodeProperty.Attributes["Type"].InnerText;
+            else if ("List" == nodeProperty.Name)
+            {
+                string propertyType = nodeProperty.Attributes["Type"].InnerText;
 #>
 
                     case "<#=propertyName#>":
@@ -328,18 +325,18 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                             int key = int.Parse(pair.Name);
                             int prevKey = (int)valueDoc["PrevKey"];
                             <#=propertyType#> element = (<#=propertyType#>)valueDoc["Value"];
-                            item.<#=propertyName#>.Add(new BsonList<<#=propertyType#>>.Element(key, prevKey, element));
+                            item.<#=propertyName#>.internalAdd(new BsonList<<#=propertyType#>>.Element(key, prevKey, element));
                         }
-                        item.<#=propertyName#>.PostDeserialize();
+                        item.<#=propertyName#>.internalPostDeserialize();
                         break;
 <#
-        } 
-        else if ("Dict" == nodeProperty.Name)
-        {
-            string keyType = nodeProperty.Attributes["KeyType"].InnerText;
-            string valueType = nodeProperty.Attributes["ValueType"].InnerText;
-            if (keyType == "string")
-            {      
+            } 
+            else if ("Dict" == nodeProperty.Name)
+            {
+                string keyType = nodeProperty.Attributes["KeyType"].InnerText;
+                string valueType = nodeProperty.Attributes["ValueType"].InnerText;
+                if (keyType == "string")
+                {      
 #>
 
                     case "<#=propertyName#>":
@@ -347,9 +344,9 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                             item.<#=propertyName#>.Add(pair.Name, (<#=valueType#>)pair.Value);
                         break;
 <#
-            }
-            else
-            {
+                }
+                else
+                {
 #>
 
                     case "<#=propertyName#>":
@@ -357,19 +354,19 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                             item.<#=propertyName#>.Add(<#=keyType#>.Parse(pair.Name), (<#=valueType#>)pair.Value);
                         break;
 <#
+                }
             }
         }
-    }
 #>
                 }
             }
             return item;
         }
 
-        public void Save(string path, MongoContext context)
+        public void Update(MongoContext context, string path = null)
         {
 <#
-    foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
+        foreach (XmlElement nodeProperty in node.SelectNodes("Property|List|Dict"))
         {
             string propertyName = nodeProperty.Attributes["Name"].InnerText;
 
@@ -393,17 +390,17 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 string propertyType = nodeProperty.Attributes["Type"].InnerText;
 #>
 
-            if (0 == <#=propertyName#>.Count && <#=propertyName#>.Removed.Count > 0)
+            if (0 == <#=propertyName#>.Count && <#=propertyName#>.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}<#=propertyName#>", 1);
             }
             else
             {
-                foreach (var key in <#=propertyName#>.Removed)
+                foreach (var key in <#=propertyName#>.internalRemoved)
                 {
                     context.Unset.Add($"{path}<#=propertyName#>.{key}", 1);
                 }
-                foreach (var element in <#=propertyName#>.ItemList)
+                foreach (var element in <#=propertyName#>.internalItems)
                 {
                     if (element.NewData)
                     {
@@ -424,7 +421,7 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 {
 #>
                         else if (null != element.Value)
-                            element.Value.Save($"{path}<#=propertyName#>.{element.Key}.Value.", context);
+                            element.Value.Update(context, $"{path}<#=propertyName#>.{element.Key}.Value.");
 <#
                 }
 #>
@@ -440,24 +437,24 @@ foreach (XmlElement node in doc.SelectNodes("/Root/Entity"))
                 string valueType = nodeProperty.Attributes["ValueType"].InnerText;
 #>
 
-            if (0 == <#=propertyName#>.Count && <#=propertyName#>.Removed.Count > 0)
+            if (0 == <#=propertyName#>.Count && <#=propertyName#>.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}<#=propertyName#>", 1);
             }
             else
             {
-                foreach(var key in <#=propertyName#>.Removed)
+                foreach(var key in <#=propertyName#>.internalRemoved)
                     context.Unset.Add($"{path}<#=propertyName#>.{key}", 1);
                 foreach (var pair in <#=propertyName#>)
                 {
-                    if (<#=propertyName#>.Added.Contains(pair.Key))
+                    if (<#=propertyName#>.internalAdded.Contains(pair.Key))
                         context.Set.Add($"{path}<#=propertyName#>.{pair.Key}", (BsonValue)pair.Value);
 <#
                 if (listEntity.Contains(valueType))
                 {
 #>
                     else if (null != pair.Value)
-                        pair.Value.Save($"{path}<#=propertyName#>.{pair.Key}.", context);
+                        pair.Value.Update(context, $"{path}<#=propertyName#>.{pair.Key}.");
 <#
                 }
 #>

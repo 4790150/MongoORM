@@ -1,11 +1,9 @@
 using MongoDB.Bson;
 using System;
-using Test;
 
 namespace Test
 {
-
-    public class Role
+    public partial class Role
     {
         public long RoleID { get; set; }
 
@@ -37,32 +35,32 @@ namespace Test
             get
             {
                 if (_RoleNameDirty) return true;
-                if (Nums.Added.Count > 0 || Nums.Removed.Count > 0) return true;
-                if (Texts.Added.Count > 0 || Texts.Removed.Count > 0) return true;
-                if (Items.Added.Count > 0 || Items.Removed.Count > 0) return true;
+                if (Nums.internalAdded.Count > 0 || Nums.internalRemoved.Count > 0) return true;
+                if (Texts.internalAdded.Count > 0 || Texts.internalRemoved.Count > 0) return true;
+                if (Items.internalAdded.Count > 0 || Items.internalRemoved.Count > 0) return true;
                 foreach (var pair in Items)
                 {
                     if (null != pair.Value && pair.Value.DataDirty)
                         return true;
                 }
-                if (DictStr.Added.Count > 0 || DictStr.Removed.Count > 0) return true;
-                if (Friends.Added.Count > 0 || Friends.Removed.Count > 0) return true;
+                if (DictStr.internalAdded.Count > 0 || DictStr.internalRemoved.Count > 0) return true;
+                if (Friends.internalAdded.Count > 0 || Friends.internalRemoved.Count > 0) return true;
                 foreach (var pair in Friends)
                 {
                     if (null != pair.Value && pair.Value.DataDirty)
                         return true;
                 }
-                foreach (var item in ListInt.ItemList)
+                foreach (var item in ListInt.internalItems)
                 {
                     if (item.DataDirty)
                         return true;
                 }
-                foreach (var item in ListStr.ItemList)
+                foreach (var item in ListStr.internalItems)
                 {
                     if (item.DataDirty)
                         return true;
                 }
-                foreach (var item in ListFriend.ItemList)
+                foreach (var item in ListFriend.internalItems)
                 {
                     if (item.DataDirty)
                         return true;
@@ -155,7 +153,7 @@ namespace Test
                 BsonDocument bsonListInt = new BsonDocument();
                 for (int i = 0; i < item.ListInt.Count; i++)
                 {
-                    var value = item.ListInt.ItemList[i];
+                    var value = item.ListInt.internalItems[i];
                     BsonDocument valueDoc = new BsonDocument();
                     valueDoc["PrevKey"] = value.PrevKey;
                     valueDoc["Value"] = (BsonValue)value.Value;
@@ -169,7 +167,7 @@ namespace Test
                 BsonDocument bsonListStr = new BsonDocument();
                 for (int i = 0; i < item.ListStr.Count; i++)
                 {
-                    var value = item.ListStr.ItemList[i];
+                    var value = item.ListStr.internalItems[i];
                     BsonDocument valueDoc = new BsonDocument();
                     valueDoc["PrevKey"] = value.PrevKey;
                     valueDoc["Value"] = (BsonValue)value.Value;
@@ -183,7 +181,7 @@ namespace Test
                 BsonDocument bsonListFriend = new BsonDocument();
                 for (int i = 0; i < item.ListFriend.Count; i++)
                 {
-                    var value = item.ListFriend.ItemList[i];
+                    var value = item.ListFriend.internalItems[i];
                     BsonDocument valueDoc = new BsonDocument();
                     valueDoc["PrevKey"] = value.PrevKey;
                     valueDoc["Value"] = (BsonValue)value.Value;
@@ -244,9 +242,9 @@ namespace Test
                             int key = int.Parse(pair.Name);
                             int prevKey = (int)valueDoc["PrevKey"];
                             int element = (int)valueDoc["Value"];
-                            item.ListInt.Add(new BsonList<int>.Element(key, prevKey, element));
+                            item.ListInt.internalAdd(new BsonList<int>.Element(key, prevKey, element));
                         }
-                        item.ListInt.PostDeserialize();
+                        item.ListInt.internalPostDeserialize();
                         break;
 
                     case "ListStr":
@@ -256,9 +254,9 @@ namespace Test
                             int key = int.Parse(pair.Name);
                             int prevKey = (int)valueDoc["PrevKey"];
                             string element = (string)valueDoc["Value"];
-                            item.ListStr.Add(new BsonList<string>.Element(key, prevKey, element));
+                            item.ListStr.internalAdd(new BsonList<string>.Element(key, prevKey, element));
                         }
-                        item.ListStr.PostDeserialize();
+                        item.ListStr.internalPostDeserialize();
                         break;
 
                     case "ListFriend":
@@ -268,16 +266,16 @@ namespace Test
                             int key = int.Parse(pair.Name);
                             int prevKey = (int)valueDoc["PrevKey"];
                             Friend element = (Friend)valueDoc["Value"];
-                            item.ListFriend.Add(new BsonList<Friend>.Element(key, prevKey, element));
+                            item.ListFriend.internalAdd(new BsonList<Friend>.Element(key, prevKey, element));
                         }
-                        item.ListFriend.PostDeserialize();
+                        item.ListFriend.internalPostDeserialize();
                         break;
                 }
             }
             return item;
         }
 
-        public void Save(string path, MongoContext context)
+        public void Update(MongoContext context, string path = null)
         {
             if (_RoleNameDirty)
             {
@@ -287,96 +285,96 @@ namespace Test
                     context.Set.Add($"{path}RoleName", _RoleName);
             }
 
-            if (0 == Nums.Count && Nums.Removed.Count > 0)
+            if (0 == Nums.Count && Nums.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}Nums", 1);
             }
             else
             {
-                foreach(var key in Nums.Removed)
+                foreach(var key in Nums.internalRemoved)
                     context.Unset.Add($"{path}Nums.{key}", 1);
                 foreach (var pair in Nums)
                 {
-                    if (Nums.Added.Contains(pair.Key))
+                    if (Nums.internalAdded.Contains(pair.Key))
                         context.Set.Add($"{path}Nums.{pair.Key}", (BsonValue)pair.Value);
                 }
             }
 
-            if (0 == Texts.Count && Texts.Removed.Count > 0)
+            if (0 == Texts.Count && Texts.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}Texts", 1);
             }
             else
             {
-                foreach(var key in Texts.Removed)
+                foreach(var key in Texts.internalRemoved)
                     context.Unset.Add($"{path}Texts.{key}", 1);
                 foreach (var pair in Texts)
                 {
-                    if (Texts.Added.Contains(pair.Key))
+                    if (Texts.internalAdded.Contains(pair.Key))
                         context.Set.Add($"{path}Texts.{pair.Key}", (BsonValue)pair.Value);
                 }
             }
 
-            if (0 == Items.Count && Items.Removed.Count > 0)
+            if (0 == Items.Count && Items.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}Items", 1);
             }
             else
             {
-                foreach(var key in Items.Removed)
+                foreach(var key in Items.internalRemoved)
                     context.Unset.Add($"{path}Items.{key}", 1);
                 foreach (var pair in Items)
                 {
-                    if (Items.Added.Contains(pair.Key))
+                    if (Items.internalAdded.Contains(pair.Key))
                         context.Set.Add($"{path}Items.{pair.Key}", (BsonValue)pair.Value);
                     else if (null != pair.Value)
-                        pair.Value.Save($"{path}Items.{pair.Key}.", context);
+                        pair.Value.Update(context, $"{path}Items.{pair.Key}.");
                 }
             }
 
-            if (0 == DictStr.Count && DictStr.Removed.Count > 0)
+            if (0 == DictStr.Count && DictStr.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}DictStr", 1);
             }
             else
             {
-                foreach(var key in DictStr.Removed)
+                foreach(var key in DictStr.internalRemoved)
                     context.Unset.Add($"{path}DictStr.{key}", 1);
                 foreach (var pair in DictStr)
                 {
-                    if (DictStr.Added.Contains(pair.Key))
+                    if (DictStr.internalAdded.Contains(pair.Key))
                         context.Set.Add($"{path}DictStr.{pair.Key}", (BsonValue)pair.Value);
                 }
             }
 
-            if (0 == Friends.Count && Friends.Removed.Count > 0)
+            if (0 == Friends.Count && Friends.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}Friends", 1);
             }
             else
             {
-                foreach(var key in Friends.Removed)
+                foreach(var key in Friends.internalRemoved)
                     context.Unset.Add($"{path}Friends.{key}", 1);
                 foreach (var pair in Friends)
                 {
-                    if (Friends.Added.Contains(pair.Key))
+                    if (Friends.internalAdded.Contains(pair.Key))
                         context.Set.Add($"{path}Friends.{pair.Key}", (BsonValue)pair.Value);
                     else if (null != pair.Value)
-                        pair.Value.Save($"{path}Friends.{pair.Key}.", context);
+                        pair.Value.Update(context, $"{path}Friends.{pair.Key}.");
                 }
             }
 
-            if (0 == ListInt.Count && ListInt.Removed.Count > 0)
+            if (0 == ListInt.Count && ListInt.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}ListInt", 1);
             }
             else
             {
-                foreach (var key in ListInt.Removed)
+                foreach (var key in ListInt.internalRemoved)
                 {
                     context.Unset.Add($"{path}ListInt.{key}", 1);
                 }
-                foreach (var element in ListInt.ItemList)
+                foreach (var element in ListInt.internalItems)
                 {
                     if (element.NewData)
                     {
@@ -397,17 +395,17 @@ namespace Test
             }
             
 
-            if (0 == ListStr.Count && ListStr.Removed.Count > 0)
+            if (0 == ListStr.Count && ListStr.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}ListStr", 1);
             }
             else
             {
-                foreach (var key in ListStr.Removed)
+                foreach (var key in ListStr.internalRemoved)
                 {
                     context.Unset.Add($"{path}ListStr.{key}", 1);
                 }
-                foreach (var element in ListStr.ItemList)
+                foreach (var element in ListStr.internalItems)
                 {
                     if (element.NewData)
                     {
@@ -428,17 +426,17 @@ namespace Test
             }
             
 
-            if (0 == ListFriend.Count && ListFriend.Removed.Count > 0)
+            if (0 == ListFriend.Count && ListFriend.internalRemoved.Count > 0)
             {
                 context.Unset.Add($"{path}ListFriend", 1);
             }
             else
             {
-                foreach (var key in ListFriend.Removed)
+                foreach (var key in ListFriend.internalRemoved)
                 {
                     context.Unset.Add($"{path}ListFriend.{key}", 1);
                 }
-                foreach (var element in ListFriend.ItemList)
+                foreach (var element in ListFriend.internalItems)
                 {
                     if (element.NewData)
                     {
@@ -455,7 +453,7 @@ namespace Test
                         if (element.ValueDirty)
                             context.Set.Add($"{path}ListFriend.{element.Key}.Value", (BsonValue)element.Value);
                         else if (null != element.Value)
-                            element.Value.Save($"{path}ListFriend.{element.Key}.Value.", context);
+                            element.Value.Update(context, $"{path}ListFriend.{element.Key}.Value.");
                     }
                 }
             }

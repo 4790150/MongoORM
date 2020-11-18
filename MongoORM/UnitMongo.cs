@@ -72,7 +72,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.RemoveAt(1);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(new BsonDocument {
@@ -114,7 +114,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.RemoveAt(0);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(new BsonDocument {
@@ -156,7 +156,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.RemoveAt(2);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(new BsonDocument {
@@ -192,7 +192,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Remove(11);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(new BsonDocument {
@@ -234,7 +234,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Remove(10);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(new BsonDocument {
@@ -276,7 +276,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Remove(12);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(new BsonDocument {
@@ -312,7 +312,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Insert(0, 9);
-            role.Save(null, context);
+            role.Update(context);
 
             collection.UpdateOne(new BsonDocument { { "_id", 1 } }, context.Build());
 
@@ -340,7 +340,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Insert(1, 13);
-            role.Save(null, context);
+            role.Update(context);
 
             collection.UpdateOne(new BsonDocument { { "_id", 1 } }, context.Build());
 
@@ -368,7 +368,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Add(13);
-            role.Save(null, context);
+            role.Update(context);
 
             collection.UpdateOne(new BsonDocument { { "_id", 1 } }, context.Build());
 
@@ -396,7 +396,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt[1] = 21;
-            role.Save(null, context);
+            role.Update(context);
 
             collection.UpdateOne(new BsonDocument { { "_id", 1 } }, context.Build());
 
@@ -423,7 +423,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListInt.Clear();
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(BsonDocument.Parse("{'$unset': {'ListInt': 1}}"), bsonUpdate);
@@ -446,7 +446,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.ListFriend.Add(null);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(BsonDocument.Parse("{$set:{'ListFriend.1': {'PrevKey':0, 'Value':null}}}"), bsonUpdate);
@@ -469,7 +469,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.Texts.Add(11, "ABC");
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Texts.11': 'ABC'}}"), bsonUpdate);
@@ -494,7 +494,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.Texts[11] = "ABC";
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Texts.11': 'ABC'}}"), bsonUpdate);
@@ -519,7 +519,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.Texts.Remove(11);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(BsonDocument.Parse("{$unset:{'Texts': 1}}"), bsonUpdate);
@@ -542,7 +542,7 @@ namespace Test
 
             MongoContext context = new MongoContext();
             role.Friends.Add(11, null);
-            role.Save(null, context);
+            role.Update(context);
 
             var bsonUpdate = context.Build();
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.11': null}}"), bsonUpdate);

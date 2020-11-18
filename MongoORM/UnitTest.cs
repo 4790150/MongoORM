@@ -25,14 +25,14 @@ namespace Test
             Role role = CreateRole();
             role.RoleName = "test";
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$set:{'RoleName':'test'}}"), context.Build());
 
             role.ClearDirty();
             context.Clear();
 
             role.RoleName = null;
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$unset:{'RoleName':1}}"), context.Build());
         }
 
@@ -43,7 +43,7 @@ namespace Test
             role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" });
             role.Friends.ClearDirty();
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.2.RoleName':'test2'}}"), context.Build());
         }
 
@@ -53,7 +53,7 @@ namespace Test
             Role role = CreateRole();
             role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" });
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.2':{'_id':2,'RoleName':'test2'}}}"), context.Build());
         }
 
@@ -63,7 +63,7 @@ namespace Test
             Role role = CreateRole();
             role.Texts.Add(2, "test2");
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Texts.2':'test2'}}"), context.Build());
 
             role.ClearDirty();
@@ -75,7 +75,7 @@ namespace Test
             Role role = CreateRole();
             role.Nums.Add(2, 2);
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Nums.2':2}}"), context.Build());
         }
 
@@ -86,7 +86,7 @@ namespace Test
             role.Nums.Add(2, 2);
             role.Nums.Add(3, 3);
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$set:{'Nums.2':2,'Nums.3':3}}"), context.Build());
         }
 
@@ -99,7 +99,7 @@ namespace Test
             role.ClearDirty();
             role.Friends.Remove(2);
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$unset:{'Friends.2':1}}"), context.Build());
         }
 
@@ -112,7 +112,7 @@ namespace Test
             role.ClearDirty();
             role.Texts.Remove(2);
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$unset:{'Texts.2':1}}"), context.Build());
         }
 
@@ -125,7 +125,7 @@ namespace Test
             role.ClearDirty();
             role.Nums.Remove(2);
 
-            role.Save(null, context);
+            role.Update(context);
             Assert.AreEqual(BsonDocument.Parse("{$unset:{'Nums.2':1}}"), context.Build());
         }
 
@@ -136,7 +136,7 @@ namespace Test
             role.RoleID = 1;
             role.RoleName = "testName";
 
-            role.Save(null, context);
+            role.Update(context);
             var actual = (BsonValue)role;
             var expected = BsonDocument.Parse("{'_id':NumberLong(1),'RoleName':'testName'}");
             Assert.AreEqual(expected, (BsonDocument)(BsonValue)role);

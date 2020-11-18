@@ -9,19 +9,19 @@ namespace Test
     public class BsonList<T> : IList<T>
     {
         private const int _defaultCapacity = 4;
-        private static Element[] _emptyArray = new Element[0];
+        private static readonly Element[] _emptyArray = new Element[0];
 
-        internal int KeySeed = 0;
+        internal int _KeySeed = 0;
 
         public int Count { get; private set; }
 
-        internal Element[] ItemList;
-        internal List<int> Removed;
+        internal Element[] internalItems;
+        internal List<int> internalRemoved;
 
         public BsonList()
         {
-            ItemList = _emptyArray;
-            Removed = new List<int>();
+            internalItems = _emptyArray;
+            internalRemoved = new List<int>();
         }
 
         public BsonList(IEnumerable<T> collection)
@@ -30,25 +30,25 @@ namespace Test
             {
                 if (0 == c.Count)
                 {
-                    ItemList = _emptyArray;
+                    internalItems = _emptyArray;
                 }
                 else
                 {
-                    ItemList = new Element[c.Count];
+                    internalItems = new Element[c.Count];
                 }
                 Capacity = c.Count;
             }
             else
             {
-                ItemList = _emptyArray;
+                internalItems = _emptyArray;
                 Capacity = 0;
             }
 
-            Removed = new List<int>();
+            internalRemoved = new List<int>();
 
             foreach (var item in collection)
             {
-                ItemList[Count++] = new Element(++KeySeed, Count, item);
+                internalItems[Count++] = new Element(++_KeySeed, Count, item);
             }
             ClearDirty();
         }
@@ -56,44 +56,44 @@ namespace Test
         public BsonList(int capacity)
         {
             this.Capacity = capacity;
-            ItemList = new Element[capacity];
-            Removed = new List<int>();
+            internalItems = new Element[capacity];
+            internalRemoved = new List<int>();
         }
 
         public T this[int index]
         {
             get
             {
-                return ItemList[index].Value;
+                return internalItems[index].Value;
             }
 
             set
             {
-                var item = ItemList[index];
+                var item = internalItems[index];
                 item.Value = value;
-                ItemList[index] = item;
+                internalItems[index] = item;
             }
         }
 
         public int Capacity {
-            get => ItemList.Length;
+            get => internalItems.Length;
             set
             {
                 if (value < Count)
                     throw new ArgumentOutOfRangeException("Capacity");
 
-                if (value != ItemList.Length)
+                if (value != internalItems.Length)
                 {
                     if (value > 0)
                     {
                         Element[] newList = new Element[value];
                         if (Count > 0)
-                            Array.Copy(ItemList, 0, newList, 0, Count);
-                        ItemList = newList;
+                            Array.Copy(internalItems, 0, newList, 0, Count);
+                        internalItems = newList;
                     }
                     else
                     {
-                        ItemList = _emptyArray;
+                        internalItems = _emptyArray;
                     }
                 }
             }
@@ -101,9 +101,9 @@ namespace Test
 
         private void EnsureCapacity(int min)
         {
-            if (ItemList.Length < min)
+            if (internalItems.Length < min)
             {
-                int newCapacity = ItemList.Length == 0 ? _defaultCapacity : ItemList.Length * 2;
+                int newCapacity = internalItems.Length == 0 ? _defaultCapacity : internalItems.Length * 2;
                 if (newCapacity < min) newCapacity = min;
                 Capacity = newCapacity;
             }
@@ -114,47 +114,47 @@ namespace Test
 
         public void Add(T item)
         {
-            if (Count == ItemList.Length)
+            if (Count == internalItems.Length)
                 EnsureCapacity(Count + 1);
 
-            ItemList[Count] = new Element(++KeySeed, Count > 0 ? ItemList[Count - 1].Key : 0, item);
+            internalItems[Count] = new Element(++_KeySeed, Count > 0 ? internalItems[Count - 1].Key : 0, item);
             Count++;
         }
 
-        internal void Add(Element element)
+        internal void internalAdd(Element element)
         {
-            if (Count == ItemList.Length)
+            if (Count == internalItems.Length)
                 EnsureCapacity(Count + 1);
 
-            if (element.Key > KeySeed)
-                KeySeed = element.Key;
+            if (element.Key > _KeySeed)
+                _KeySeed = element.Key;
 
-            ItemList[Count++] = element;
+            internalItems[Count++] = element;
         }
 
-        internal void PostDeserialize()
+        internal void internalPostDeserialize()
         {
             int prevKey = 0;
             for (int i = 0; i < Count; i++)
             {
-                if (ItemList[i].PrevKey == prevKey)
+                if (internalItems[i].PrevKey == prevKey)
                 {
-                    prevKey = ItemList[i].Key;
+                    prevKey = internalItems[i].Key;
                     continue;
                 }
 
                 for (int j = i + 1; j < Count; j++)
                 {
-                    if (ItemList[j].PrevKey == prevKey)
+                    if (internalItems[j].PrevKey == prevKey)
                     {
-                        var temp = ItemList[j];
-                        ItemList[j] = ItemList[i];
-                        ItemList[i] = temp;
+                        var temp = internalItems[j];
+                        internalItems[j] = internalItems[i];
+                        internalItems[i] = temp;
                         break;
                     }
                 }
 
-                prevKey = ItemList[i].Key;
+                prevKey = internalItems[i].Key;
             }
         }
 
@@ -164,13 +164,13 @@ namespace Test
             {
                 for (int i = 0; i < Count; i++)
                 {
-                    if (!ItemList[i].NewData)
+                    if (!internalItems[i].NewData)
                     {
-                        Removed.Add(ItemList[i].Key);
+                        internalRemoved.Add(internalItems[i].Key);
                     }
                 }
 
-                Array.Clear(ItemList, 0, Count);
+                Array.Clear(internalItems, 0, Count);
                 Count = 0;
             }
         }
@@ -179,13 +179,13 @@ namespace Test
         {
             for (int i = 0; i < Count; i++)
             {
-                ItemList[i].ClearDirty();
+                internalItems[i].ClearDirty();
             }
         }
 
         public bool Contains(T item)
         {
-            foreach (var element in ItemList)
+            foreach (var element in internalItems)
             {
                 if (element.Value.Equals(item))
                     return true;
@@ -198,7 +198,7 @@ namespace Test
         {
             for (int i = 0; i < Count; i++)
             {
-                if (ItemList[i].Value.Equals(item))
+                if (internalItems[i].Value.Equals(item))
                     return i;
             }
 
@@ -210,24 +210,24 @@ namespace Test
             if (index > Count)
                 throw new ArgumentOutOfRangeException("index");
 
-            if (Count == ItemList.Length)
+            if (Count == internalItems.Length)
                 EnsureCapacity(Count + 1);
 
             if (index < Count)
-                Array.Copy(ItemList, index, ItemList, index + 1, Count - index);
+                Array.Copy(internalItems, index, internalItems, index + 1, Count - index);
 
-            ItemList[index] = new Element(++KeySeed, index > 0 ? ItemList[index - 1].Key : 0, item);
+            internalItems[index] = new Element(++_KeySeed, index > 0 ? internalItems[index - 1].Key : 0, item);
             Count++;
 
             if (index < Count - 1)
-                ItemList[index + 1].PrevKey = KeySeed;
+                internalItems[index + 1].PrevKey = _KeySeed;
         }
 
         public bool Remove(T item)
         {
             for (int i = 0; i < Count; i++)
             {
-                var element = ItemList[i];
+                var element = internalItems[i];
                 if (element.Value.Equals(item))
                 {
                     RemoveAt(i);
@@ -240,21 +240,21 @@ namespace Test
 
         public void RemoveAt(int index)
         {
-            var element = ItemList[index];
+            var element = internalItems[index];
             if (!element.NewData)
             {
-                Removed.Add(element.Key);
+                internalRemoved.Add(element.Key);
             }
 
             Count--;
             if (index < Count)
             { 
-                Array.Copy(ItemList, index + 1, ItemList, index, Count - index);
+                Array.Copy(internalItems, index + 1, internalItems, index, Count - index);
 
-                ItemList[index].PrevKey = index > 0 ? ItemList[index - 1].Key : 0;
+                internalItems[index].PrevKey = index > 0 ? internalItems[index - 1].Key : 0;
             }
 
-            ItemList[Count] = default(Element);
+            internalItems[Count] = default(Element);
         }
 
         public IEnumerator<T> GetEnumerator()

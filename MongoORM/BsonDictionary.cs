@@ -8,76 +8,76 @@ namespace Test
 {
     public class BsonDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     {
-        internal Dictionary<TKey, TValue> Items = new Dictionary<TKey, TValue>();
-        internal HashSet<TKey> Added = new HashSet<TKey>();
-        internal HashSet<TKey> Removed = new HashSet<TKey>();
+        internal Dictionary<TKey, TValue> internalItems = new Dictionary<TKey, TValue>();
+        internal HashSet<TKey> internalAdded = new HashSet<TKey>();
+        internal HashSet<TKey> internalRemoved = new HashSet<TKey>();
 
-        public int Count { get => Items.Count; }
+        public int Count { get => internalItems.Count; }
 
-        public ICollection<TKey> Keys => Items.Keys;
+        public ICollection<TKey> Keys => internalItems.Keys;
 
-        public ICollection<TValue> Values => Items.Values;
+        public ICollection<TValue> Values => internalItems.Values;
 
         public bool IsReadOnly => false;
 
         internal void ClearDirty()
         {
-            Added.Clear();
-            Removed.Clear();
+            internalAdded.Clear();
+            internalRemoved.Clear();
         }
 
         public void Clear()
         {
-            foreach (var pair in Items)
+            foreach (var pair in internalItems)
             {
-                if (!Added.Contains(pair.Key))
-                    Removed.Add(pair.Key);
+                if (!internalAdded.Contains(pair.Key))
+                    internalRemoved.Add(pair.Key);
             }
 
-            Added.Clear();
-            Items.Clear();
+            internalAdded.Clear();
+            internalItems.Clear();
         }
 
         public TValue this[TKey key]
         {
             get
             {
-                return Items[key];
+                return internalItems[key];
             }
             set
             {
-                Items[key] = value;
-                Added.Add(key);
+                internalItems[key] = value;
+                internalAdded.Add(key);
             }
         }
 
         public bool TryGetValue(TKey key, out TValue value)
         {
-            return Items.TryGetValue(key, out value);
+            return internalItems.TryGetValue(key, out value);
         }
 
         public void Add(TKey key, TValue value)
         {
-            Items[key] = value;
-            Added.Add(key);
+            internalItems[key] = value;
+            internalAdded.Add(key);
 
         }
 
         public bool Remove(TKey key)
         {
-            if (!Items.TryGetValue(key, out TValue value))
+            if (!internalItems.TryGetValue(key, out TValue value))
                 return false;
 
-            bool newData = Added.Contains(key);
+            bool newData = internalAdded.Contains(key);
 
-            Items.Remove(key);     
+            internalItems.Remove(key);     
             if (newData)
             {
-                Added.Remove(key);
+                internalAdded.Remove(key);
             }
             else
             {
-                Removed.Add(key);
+                internalRemoved.Add(key);
             }
 
             return true;
@@ -85,7 +85,7 @@ namespace Test
 
         public bool ContainsKey(TKey key)
         {
-            return Items.ContainsKey(key);
+            return internalItems.ContainsKey(key);
         }
 
         void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item)
@@ -124,7 +124,7 @@ namespace Test
 
             public Enumerator(BsonDictionary<TKey, TValue> list)
             {
-                _Enumerator = list.Items.GetEnumerator();
+                _Enumerator = list.internalItems.GetEnumerator();
             }
 
             public KeyValuePair<TKey, TValue> Current => _Enumerator.Current;

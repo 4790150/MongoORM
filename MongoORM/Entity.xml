@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<Root>
+<Root Namespace="Test">
   <Entity Name="Friend" PrimaryKey="RoleID">
     <Property Name="RoleID" Type="long"/>
     <Property Name="RoleName" Type="string"/>

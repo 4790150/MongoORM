@@ -1,11 +1,9 @@
 using MongoDB.Bson;
 using System;
-using Test;
 
 namespace Test
 {
-
-    public class Friend
+    public partial class Friend
     {
         public long RoleID { get; set; }
 
@@ -80,7 +78,7 @@ namespace Test
             return item;
         }
 
-        public void Save(string path, MongoContext context)
+        public void Update(MongoContext context, string path = null)
         {
             if (_RoleNameDirty)
             {
