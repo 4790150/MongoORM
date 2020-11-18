@@ -15,6 +15,7 @@
     <Dict Name="Nums" KeyType="int" ValueType="int"/>
     <Dict Name="Texts" KeyType="int" ValueType="string"/>
     <Dict Name="Items" KeyType="int" ValueType="Item"/>
+    <Dict Name="DictStr" KeyType="string" ValueType="string"/>
     <Dict Name="Friends" KeyType="long" ValueType="Friend"/>
     <List Name="ListInt" Type="int"/>
     <List Name="ListStr" Type="string"/>

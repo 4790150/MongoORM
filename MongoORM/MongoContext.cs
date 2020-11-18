@@ -5,14 +5,7 @@ using System.Text;
 
 namespace Test
 {
-    public enum UpdateState : byte
-    {
-        None = 1,
-        Set = 1 << 1,
-        Unset = 1 << 2,
-    }
-
-    public class MongoSql
+    public class MongoContext
     {
         public BsonDocument Bson = new BsonDocument();
         public BsonDocument Set = new BsonDocument();
@@ -25,7 +18,7 @@ namespace Test
             Unset.Clear();
         }
 
-        public BsonDocument ToSql()
+        public BsonDocument Build()
         {
             if (Bson.ElementCount > 0)
                 return Bson;

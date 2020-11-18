@@ -6,150 +6,188 @@ using System.Text;
 
 namespace Test
 {
-    public struct BsonListElement<T>
-    {
-        public BsonListElement(int key, T element)
-        {
-            this.Key = key;
-            this._PrevKey = 0;
-            this._PrevKeyDirty = false;
-            this._Element = element;
-            this._ElementDirty = false;
-        }
-
-        public BsonListElement(int key, int prevKey, T element)
-        {
-            this.Key = key;
-            this._PrevKey = prevKey;
-            this._PrevKeyDirty = false;
-            this._Element = element;
-            this._ElementDirty = false;
-        }
-
-        public int Key { get; internal set; }
-
-        private bool _PrevKeyDirty;
-        private int _PrevKey;
-        public int PrevKey
-        {
-            get => _PrevKey;
-            set
-            {
-                if (value == _PrevKey)
-                    return;
-
-                _PrevKey = value;
-                _PrevKeyDirty = true;
-            }
-        }
-
-        private bool _ElementDirty;
-        private T _Element;
-        public T Element
-        {
-            get => _Element;
-            set
-            {
-                if (value.Equals(_Element))
-                    return;
-
-                _Element = value;
-                _ElementDirty = true;
-            }
-        }
-
-        public bool Dirty { get => _ElementDirty; set => _ElementDirty = value; }
-    }
-
     public class BsonList<T> : IList<T>
     {
-        internal List<BsonListElement<T>> ItemList;
-        internal List<BsonListElement<T>> RemovedList;
+        private const int _defaultCapacity = 4;
+        private static Element[] _emptyArray = new Element[0];
 
-        private int KeySeed = 1;
+        internal int KeySeed = 0;
 
-        public BsonList() : this(4)
+        public int Count { get; private set; }
+
+        internal Element[] ItemList;
+        internal List<int> Removed;
+
+        public BsonList()
         {
-
+            ItemList = _emptyArray;
+            Removed = new List<int>();
         }
 
         public BsonList(IEnumerable<T> collection)
         {
-            int count = 0;
-            foreach (var item in collection)
-                count++;
+            if (collection is ICollection<T> c)
+            {
+                if (0 == c.Count)
+                {
+                    ItemList = _emptyArray;
+                }
+                else
+                {
+                    ItemList = new Element[c.Count];
+                }
+                Capacity = c.Count;
+            }
+            else
+            {
+                ItemList = _emptyArray;
+                Capacity = 0;
+            }
 
-            ItemList = new List<BsonListElement<T>>(count);
-            RemovedList = new List<BsonListElement<T>>();
+            Removed = new List<int>();
 
             foreach (var item in collection)
             {
-                ItemList.Add(new BsonListElement<T>(KeySeed++, ItemList.Count > 0 ? ItemList.Count : 0, item));
+                ItemList[Count++] = new Element(++KeySeed, Count, item);
             }
-            ClearState();
+            ClearDirty();
         }
 
         public BsonList(int capacity)
         {
-            ItemList = new List<BsonListElement<T>>(capacity);
-            RemovedList = new List<BsonListElement<T>>(capacity);
+            this.Capacity = capacity;
+            ItemList = new Element[capacity];
+            Removed = new List<int>();
         }
 
         public T this[int index]
         {
             get
             {
-                return ItemList[index].Element;
+                return ItemList[index].Value;
             }
 
             set
             {
                 var item = ItemList[index];
-                item.Element = value;
+                item.Value = value;
                 ItemList[index] = item;
             }
         }
 
-        public int Count { get => ItemList.Count; }
+        public int Capacity {
+            get => ItemList.Length;
+            set
+            {
+                if (value < Count)
+                    throw new ArgumentOutOfRangeException("Capacity");
+
+                if (value != ItemList.Length)
+                {
+                    if (value > 0)
+                    {
+                        Element[] newList = new Element[value];
+                        if (Count > 0)
+                            Array.Copy(ItemList, 0, newList, 0, Count);
+                        ItemList = newList;
+                    }
+                    else
+                    {
+                        ItemList = _emptyArray;
+                    }
+                }
+            }
+        }
+
+        private void EnsureCapacity(int min)
+        {
+            if (ItemList.Length < min)
+            {
+                int newCapacity = ItemList.Length == 0 ? _defaultCapacity : ItemList.Length * 2;
+                if (newCapacity < min) newCapacity = min;
+                Capacity = newCapacity;
+            }
+        }
+
 
         public bool IsReadOnly => false;
 
         public void Add(T item)
         {
-            ItemList.Add(new BsonListElement<T>(KeySeed++, ItemList.Count > 0 ? ItemList[ItemList.Count - 1].Key : 0, item));
+            if (Count == ItemList.Length)
+                EnsureCapacity(Count + 1);
+
+            ItemList[Count] = new Element(++KeySeed, Count > 0 ? ItemList[Count - 1].Key : 0, item);
+            Count++;
+        }
+
+        internal void Add(Element element)
+        {
+            if (Count == ItemList.Length)
+                EnsureCapacity(Count + 1);
+
+            if (element.Key > KeySeed)
+                KeySeed = element.Key;
+
+            ItemList[Count++] = element;
+        }
+
+        internal void PostDeserialize()
+        {
+            int prevKey = 0;
+            for (int i = 0; i < Count; i++)
+            {
+                if (ItemList[i].PrevKey == prevKey)
+                {
+                    prevKey = ItemList[i].Key;
+                    continue;
+                }
+
+                for (int j = i + 1; j < Count; j++)
+                {
+                    if (ItemList[j].PrevKey == prevKey)
+                    {
+                        var temp = ItemList[j];
+                        ItemList[j] = ItemList[i];
+                        ItemList[i] = temp;
+                        break;
+                    }
+                }
+
+                prevKey = ItemList[i].Key;
+            }
         }
 
         public void Clear()
         {
-            foreach (var element in ItemList)
+            if (Count > 0)
             {
-                if (!element.Dirty)
+                for (int i = 0; i < Count; i++)
                 {
-                    RemovedList.Add(element);
+                    if (!ItemList[i].NewData)
+                    {
+                        Removed.Add(ItemList[i].Key);
+                    }
                 }
+
+                Array.Clear(ItemList, 0, Count);
+                Count = 0;
             }
-            ItemList.Clear();
         }
 
-        public void ClearState()
+        internal void ClearDirty()
         {
-            for (int i = 0; i < ItemList.Count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                var item = ItemList[i];
-                ItemList[i] = new BsonListElement<T>(item.Key, item.PrevKey, item.Element);
+                ItemList[i].ClearDirty();
             }
-        }
-
-        public bool IsModifyed(int index)
-        {
-            return ItemList[index].Dirty;
         }
 
         public bool Contains(T item)
         {
             foreach (var element in ItemList)
             {
-                if (element.Element.Equals(item))
+                if (element.Value.Equals(item))
                     return true;
             }
 
@@ -158,9 +196,9 @@ namespace Test
 
         public int IndexOf(T item)
         {
-            for (int i = 0; i < ItemList.Count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                if (ItemList[i].Element.Equals(item))
+                if (ItemList[i].Value.Equals(item))
                     return i;
             }
 
@@ -169,27 +207,30 @@ namespace Test
 
         public void Insert(int index, T item)
         {
-            ItemList.Insert(index, new BsonListElement<T>(KeySeed++, index > 0 ? ItemList[index - 1].Key : 0, item));
+            if (index > Count)
+                throw new ArgumentOutOfRangeException("index");
+
+            if (Count == ItemList.Length)
+                EnsureCapacity(Count + 1);
+
+            if (index < Count)
+                Array.Copy(ItemList, index, ItemList, index + 1, Count - index);
+
+            ItemList[index] = new Element(++KeySeed, index > 0 ? ItemList[index - 1].Key : 0, item);
+            Count++;
+
+            if (index < Count - 1)
+                ItemList[index + 1].PrevKey = KeySeed;
         }
 
         public bool Remove(T item)
         {
-            for (int i = 0; i < ItemList.Count; i++)
+            for (int i = 0; i < Count; i++)
             {
                 var element = ItemList[i];
-                if (element.Element.Equals(item))
+                if (element.Value.Equals(item))
                 {
-                    if (!element.Dirty)
-                    {
-                        RemovedList.Add(element);
-                    }
-                    ItemList.RemoveAt(i);
-
-                    if (i < ItemList.Count)
-                    {
-                        var next = ItemList[i];
-                        next.PrevKey = i > 0 ? ItemList[i - 1].Key : 0;
-                    }
+                    RemoveAt(i);
                     return true;
                 }
             }
@@ -200,17 +241,20 @@ namespace Test
         public void RemoveAt(int index)
         {
             var element = ItemList[index];
-            if (!element.Dirty)
+            if (!element.NewData)
             {
-                RemovedList.Add(ItemList[index]);
+                Removed.Add(element.Key);
             }
-            ItemList.RemoveAt(index);
 
-            if (index < ItemList.Count)
-            {
-                var next = ItemList[index];
-                next.PrevKey = index > 0 ? ItemList[index - 1].Key : 0;
+            Count--;
+            if (index < Count)
+            { 
+                Array.Copy(ItemList, index + 1, ItemList, index, Count - index);
+
+                ItemList[index].PrevKey = index > 0 ? ItemList[index - 1].Key : 0;
             }
+
+            ItemList[Count] = default(Element);
         }
 
         public IEnumerator<T> GetEnumerator()
@@ -218,7 +262,7 @@ namespace Test
             return new Enumerator(this);
         }
 
-        public void CopyTo(T[] array, int arrayIndex)
+        void ICollection<T>.CopyTo(T[] array, int arrayIndex)
         {
             throw new NotImplementedException();
         }
@@ -254,6 +298,67 @@ namespace Test
             public void Reset()
             {
                 Index = -1;
+            }
+        }
+
+        public struct Element
+        {
+            private const int NewTag = 1;
+            private const int PrevTag = 1 << 1;
+            private const int ValueTag = 1 << 2;
+            private int _DataDirty;
+
+            public Element(int key, int prevKey, T value)
+            {
+                this.Key = key;
+                this._PrevKey = prevKey;
+                this._Value = value;
+                this._DataDirty = NewTag;
+            }
+
+            public int Key { get; internal set; }
+
+            internal bool PrevKeyDirty => 0 != (_DataDirty & PrevTag);
+            private int _PrevKey;
+            public int PrevKey
+            {
+                get => _PrevKey;
+                set
+                {
+                    if (value == _PrevKey)
+                        return;
+
+                    _PrevKey = value;
+                    _DataDirty |= PrevTag;
+                }
+            }
+
+            internal bool ValueDirty => 0 != (_DataDirty & ValueTag);
+            private T _Value;
+            public T Value
+            {
+                get => _Value;
+                set
+                {
+                    if (value.Equals(_Value))
+                        return;
+
+                    _Value = value;
+                    _DataDirty |= ValueTag;
+                }
+            }
+
+            public bool DataDirty { get => 0 != _DataDirty; }
+
+            public bool NewData
+            {
+                get => 0 != (_DataDirty & NewTag);
+                set => _DataDirty |= NewTag;
+            }
+
+            public void ClearDirty()
+            {
+                _DataDirty = 0;
             }
         }
     }

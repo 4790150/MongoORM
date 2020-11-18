@@ -5,7 +5,7 @@ namespace Test
 {
     public class UnitTest
     {
-        MongoSql sql = new MongoSql();
+        MongoContext context = new MongoContext();
 
         Role CreateRole()
         {
@@ -16,7 +16,7 @@ namespace Test
         [SetUp]
         public void Setup()
         {
-            sql.Clear();
+            context.Clear();
         }
 
         [Test]
@@ -25,92 +25,108 @@ namespace Test
             Role role = CreateRole();
             role.RoleName = "test";
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$set:{'RoleName':'test'}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$set:{'RoleName':'test'}}"), context.Build());
+
+            role.ClearDirty();
+            context.Clear();
+
+            role.RoleName = null;
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$unset:{'RoleName':1}}"), context.Build());
         }
 
         [Test]
         public void SetSubDocumentProperty()
         {
             Role role = CreateRole();
-            role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" }, false);
+            role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" });
+            role.Friends.ClearDirty();
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.2.RoleName':'test2'}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.2.RoleName':'test2'}}"), context.Build());
         }
 
         [Test]
-        public void SetDocumentClass()
+        public void SetSubDocumentClass()
         {
             Role role = CreateRole();
-            role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" }, true);
+            role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" });
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.2':{'RoleID':2,'RoleName':'test2'}}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$set:{'Friends.2':{'_id':2,'RoleName':'test2'}}}"), context.Build());
         }
 
         [Test]
-        public void SetDocumentString()
+        public void SetSubDocumentString()
         {
             Role role = CreateRole();
-            role.Texts.Add(2, "test2", true);
+            role.Texts.Add(2, "test2");
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$set:{'Texts.2':'test2'}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$set:{'Texts.2':'test2'}}"), context.Build());
+
+            role.ClearDirty();
         }
 
         [Test]
-        public void SetDocumentPrimary()
+        public void SetSubDocumentPrimary()
         {
             Role role = CreateRole();
-            role.Nums.Add(2, 2, true);
+            role.Nums.Add(2, 2);
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$set:{'Nums.2':2}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$set:{'Nums.2':2}}"), context.Build());
         }
 
         [Test]
         public void SetPrimaryMulti()
         {
             Role role = CreateRole();
-            role.Nums.Add(2, 2, true);
-            role.Nums.Add(3, 3, true);
+            role.Nums.Add(2, 2);
+            role.Nums.Add(3, 3);
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$set:{'Nums.2':2,'Nums.3':3}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$set:{'Nums.2':2,'Nums.3':3}}"), context.Build());
         }
 
         [Test]
         public void UnsetDocumentClass()
         {
             Role role = CreateRole();
-            role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" }, false);
+            role.Friends.Add(1, null);
+            role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "test2" });
+            role.ClearDirty();
             role.Friends.Remove(2);
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$unset:{'Friends.2':1}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$unset:{'Friends.2':1}}"), context.Build());
         }
 
         [Test]
         public void UnsetDocumentString()
         {
             Role role = CreateRole();
-            role.Texts.Add(2, "test2", false);
+            role.Texts.Add(1, "test1");
+            role.Texts.Add(2, "test2");
+            role.ClearDirty();
             role.Texts.Remove(2);
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$unset:{'Texts.2':1}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$unset:{'Texts.2':1}}"), context.Build());
         }
 
         [Test]
         public void UnsetDocumentPrimary()
         {
             Role role = CreateRole();
-            role.Nums.Add(2, 2, false);
+            role.Nums.Add(1, 1);
+            role.Nums.Add(2, 2);
+            role.ClearDirty();
             role.Nums.Remove(2);
 
-            role.Save(null, sql);
-            Assert.AreEqual(BsonDocument.Parse("{$unset:{'Nums.2':1}}"), sql.ToSql());
+            role.Save(null, context);
+            Assert.AreEqual(BsonDocument.Parse("{$unset:{'Nums.2':1}}"), context.Build());
         }
 
         [Test]
@@ -120,9 +136,9 @@ namespace Test
             role.RoleID = 1;
             role.RoleName = "testName";
 
-            role.Save(null, sql);
+            role.Save(null, context);
             var actual = (BsonValue)role;
-            var expected = BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{},'Texts':{},'Items':{},'Friends':{},'ListInt':[],'ListStr':[],'ListFriend':[]}");
+            var expected = BsonDocument.Parse("{'_id':NumberLong(1),'RoleName':'testName'}");
             Assert.AreEqual(expected, (BsonDocument)(BsonValue)role);
         }
 
@@ -134,7 +150,7 @@ namespace Test
             role.RoleName = "testName";
             role.Friends.Add(2, new Friend { RoleID = 2, RoleName = "friendName" });
 
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{},'Texts':{},'Items':{},'Friends':{'2':{'RoleID':2,'RoleName':'friendName'}},'ListInt':[],'ListStr':[],'ListFriend':[]}"), (BsonValue)role);
+            Assert.AreEqual(BsonDocument.Parse("{'_id':NumberLong(1),'RoleName':'testName','Friends':{'2':{'_id':2,'RoleName':'friendName'}}}"), (BsonValue)role);
         }
 
         [Test]
@@ -145,7 +161,7 @@ namespace Test
             role.RoleName = "testName";
             role.Texts.Add(2, "friendName");
 
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{},'Texts':{'2':'friendName'},'Items':{},'Friends':{},'ListInt':[],'ListStr':[],'ListFriend':[]}"), (BsonValue)role);
+            Assert.AreEqual(BsonDocument.Parse("{'_id':NumberLong(1),'RoleName':'testName','Texts':{'2':'friendName'}}"), (BsonValue)role);
         }
 
         [Test]
@@ -156,7 +172,7 @@ namespace Test
             role.RoleName = "testName";
             role.Nums.Add(2, 2);
 
-            Assert.AreEqual(BsonDocument.Parse("{'RoleID':NumberLong(1),'RoleName':'testName','Nums':{'2':2},'Texts':{},'Items':{},'Friends':{},'ListInt':[],'ListStr':[],'ListFriend':[]}"), (BsonValue)role);
+            Assert.AreEqual(BsonDocument.Parse("{'_id':NumberLong(1),'RoleName':'testName','Nums':{'2':2}}"), (BsonValue)role);
         }
 
         [Test]
@@ -172,47 +188,6 @@ namespace Test
             Assert.AreEqual(2, dict.Count);
             dict.Remove(1);
             Assert.AreEqual(1, dict.Count);
-            dict.SetState(1, UpdateState.None);
-            Assert.AreEqual(2, dict.Count);
-            dict.SetState(1, UpdateState.Unset);
-            Assert.AreEqual(1, dict.Count);
-            dict.SetState(1, UpdateState.Set);
-            Assert.AreEqual(2, dict.Count);
-            dict.SetState(1, UpdateState.Unset);
-            dict.ClearState();
-            Assert.AreEqual(1, dict.Count);
-        }
-
-        [Test]
-        public void BsonList_ToBsonValue()
-        {
-            BsonList<int> list = new BsonList<int> { 1, 2, 3 };
-            BsonValue actual = MongoUtility2.ToBsonValue(list);
-
-            var expected = new BsonDocument()
-            {
-                {"1", new BsonDocument{ { "PrevKey", 0 },{ "Value", 1} } },
-                {"2", new BsonDocument{ { "PrevKey", 1 },{ "Value", 2} }},
-                {"3", new BsonDocument{ { "PrevKey", 2 },{ "Value", 3} }}
-            };
-
-            Assert.AreEqual(expected, actual);
-        }
-
-        [Test]
-        public void BsonList_Parse()
-        {
-            var document = new BsonDocument()
-            {
-                {"1", new BsonDocument{ { "PrevKey", 0 },{ "Value", 1} } },
-                {"2", new BsonDocument{ { "PrevKey", 1 },{ "Value", 2} }},
-                {"3", new BsonDocument{ { "PrevKey", 2 },{ "Value", 3} }}
-            };
-
-            MongoUtility2.Parse(document, out BsonList<int> list);
-            Assert.AreEqual(1, list[0]);
-            Assert.AreEqual(2, list[1]);
-            Assert.AreEqual(3, list[2]);
         }
     }
 }

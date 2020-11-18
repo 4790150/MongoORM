@@ -26,273 +26,437 @@ namespace Test
         public readonly BsonDictionary<int, int> Nums = new BsonDictionary<int, int>();
         public readonly BsonDictionary<int, string> Texts = new BsonDictionary<int, string>();
         public readonly BsonDictionary<int, Item> Items = new BsonDictionary<int, Item>();
+        public readonly BsonDictionary<string, string> DictStr = new BsonDictionary<string, string>();
         public readonly BsonDictionary<long, Friend> Friends = new BsonDictionary<long, Friend>();
         public readonly BsonList<int> ListInt = new BsonList<int>();
         public readonly BsonList<string> ListStr = new BsonList<string>();
         public readonly BsonList<Friend> ListFriend = new BsonList<Friend>();
+
         public bool DataDirty
         {
             get
             {
-                bool dirty = false;
                 if (_RoleNameDirty) return true;
-
-                dirty = false;
-                Nums.Foreach(UpdateState.Set | UpdateState.Unset, (key, item, state) =>
+                if (Nums.Added.Count > 0 || Nums.Removed.Count > 0) return true;
+                if (Texts.Added.Count > 0 || Texts.Removed.Count > 0) return true;
+                if (Items.Added.Count > 0 || Items.Removed.Count > 0) return true;
+                foreach (var pair in Items)
                 {
-                    dirty = true;
-                });
-                if (dirty) return true;
-
-                dirty = false;
-                Texts.Foreach(UpdateState.Set | UpdateState.Unset, (key, item, state) =>
+                    if (null != pair.Value && pair.Value.DataDirty)
+                        return true;
+                }
+                if (DictStr.Added.Count > 0 || DictStr.Removed.Count > 0) return true;
+                if (Friends.Added.Count > 0 || Friends.Removed.Count > 0) return true;
+                foreach (var pair in Friends)
                 {
-                    dirty = true;
-                });
-                if (dirty) return true;
-
-                dirty = false;
-                Items.Foreach(UpdateState.None | UpdateState.Set | UpdateState.Unset, (key, item, state) =>
-                {
-                    if (UpdateState.Set == state || UpdateState.Unset == state)
-                    {
-                        dirty = true;
-                    }
-                    else
-                    {
-                        if (item.DataDirty)
-                            dirty = true;
-                    }
-                });
-                if (dirty) return true;
-
-                dirty = false;
-                Friends.Foreach(UpdateState.None | UpdateState.Set | UpdateState.Unset, (key, item, state) =>
-                {
-                    if (UpdateState.Set == state || UpdateState.Unset == state)
-                    {
-                        dirty = true;
-                    }
-                    else
-                    {
-                        if (item.DataDirty)
-                            dirty = true;
-                    }
-                });
-                if (dirty) return true;
+                    if (null != pair.Value && pair.Value.DataDirty)
+                        return true;
+                }
                 foreach (var item in ListInt.ItemList)
                 {
-                    if (item.Dirty)
+                    if (item.DataDirty)
                         return true;
                 }
                 foreach (var item in ListStr.ItemList)
                 {
-                    if (item.Dirty)
+                    if (item.DataDirty)
                         return true;
                 }
                 foreach (var item in ListFriend.ItemList)
                 {
-                    if (item.Dirty)
+                    if (item.DataDirty)
                         return true;
-                    if (item.Element.DataDirty)
+                    if (null !=  item.Value && item.Value.DataDirty)
                         return true;
                 }
                 return false;
             }
         }
 
-        public void ClearState()
+        public void ClearDirty()
         {
             _RoleNameDirty = false;
-            Nums.ClearState();
-            Texts.ClearState();
-            Items.ClearState();
-            Friends.ClearState();
-            ListInt.ClearState();
-            ListStr.ClearState();
-            ListFriend.ClearState();
+            Nums.ClearDirty();
+            Texts.ClearDirty();
+            Items.ClearDirty();
+            foreach (var pair in Items)
+                pair.Value?.ClearDirty();
+            DictStr.ClearDirty();
+            Friends.ClearDirty();
+            foreach (var pair in Friends)
+                pair.Value?.ClearDirty();
+            ListInt.ClearDirty();
+            ListStr.ClearDirty();
+            ListFriend.ClearDirty();
+            foreach (var item in ListFriend)
+                item?.ClearDirty();
         }
 
         public static explicit operator BsonValue(Role item)
         {
-            BsonDocument sb = new BsonDocument();
-            sb.Add("RoleID", item.RoleID);
-            sb.Add("RoleName", item._RoleName);
+            if (null == item)
+                return BsonNull.Value;
 
-            BsonDocument bsonNums = new BsonDocument();
-            item.Nums.Foreach(UpdateState.None | UpdateState.Set, (key, sub, state) =>
-            {
-                bsonNums.Add(key.ToString(), sub);
-            });
-            sb.Add("Nums", bsonNums);
+            return (BsonDocument)item;
+        }
 
-            BsonDocument bsonTexts = new BsonDocument();
-            item.Texts.Foreach(UpdateState.None | UpdateState.Set, (key, sub, state) =>
-            {
-                bsonTexts.Add(key.ToString(), sub);
-            });
-            sb.Add("Texts", bsonTexts);
+        public static explicit operator BsonDocument(Role item)
+        {
+            if (null == item)
+                return null;
 
-            BsonDocument bsonItems = new BsonDocument();
-            item.Items.Foreach(UpdateState.None | UpdateState.Set, (key, sub, state) =>
-            {
-                bsonItems.Add(key.ToString(), sub?.ToBsonDocument());
-            });
-            sb.Add("Items", bsonItems);
+            BsonDocument document = new BsonDocument();
+            document.Add("_id", item.RoleID);
+            if (default(string) != item._RoleName)
+                document.Add("RoleName", item._RoleName);
 
-            BsonDocument bsonFriends = new BsonDocument();
-            item.Friends.Foreach(UpdateState.None | UpdateState.Set, (key, sub, state) =>
+            if (item.Nums.Count > 0)
             {
-                bsonFriends.Add(key.ToString(), sub?.ToBsonDocument());
-            });
-            sb.Add("Friends", bsonFriends);
-
-            BsonArray bsonListInt = new BsonArray();
-            for (int i = 0; i < item.ListInt.Count; i++)
-            {
-                bsonListInt.Add(item.ListInt[i]);
+                BsonDocument bsonNums = new BsonDocument();
+                foreach (var pair in item.Nums)
+                    bsonNums.Add(pair.Key.ToString(), (BsonValue)pair.Value);
+                document.Add("Nums", bsonNums);
             }
-            sb.Add("ListInt", bsonListInt);
 
-            BsonArray bsonListStr = new BsonArray();
-            for (int i = 0; i < item.ListStr.Count; i++)
+            if (item.Texts.Count > 0)
             {
-                bsonListStr.Add(item.ListStr[i]);
+                BsonDocument bsonTexts = new BsonDocument();
+                foreach (var pair in item.Texts)
+                    bsonTexts.Add(pair.Key.ToString(), (BsonValue)pair.Value);
+                document.Add("Texts", bsonTexts);
             }
-            sb.Add("ListStr", bsonListStr);
 
-            BsonArray bsonListFriend = new BsonArray();
-            for (int i = 0; i < item.ListFriend.Count; i++)
+            if (item.Items.Count > 0)
             {
-                bsonListFriend.Add(item.ListFriend[i]?.ToBsonDocument());
+                BsonDocument bsonItems = new BsonDocument();
+                foreach (var pair in item.Items)
+                    bsonItems.Add(pair.Key.ToString(), (BsonValue)pair.Value);
+                document.Add("Items", bsonItems);
             }
-            sb.Add("ListFriend", bsonListFriend);
-            return sb;
+
+            if (item.DictStr.Count > 0)
+            {
+                BsonDocument bsonDictStr = new BsonDocument();
+                foreach (var pair in item.DictStr)
+                    bsonDictStr.Add(pair.Key.ToString(), (BsonValue)pair.Value);
+                document.Add("DictStr", bsonDictStr);
+            }
+
+            if (item.Friends.Count > 0)
+            {
+                BsonDocument bsonFriends = new BsonDocument();
+                foreach (var pair in item.Friends)
+                    bsonFriends.Add(pair.Key.ToString(), (BsonValue)pair.Value);
+                document.Add("Friends", bsonFriends);
+            }
+
+            if (item.ListInt.Count > 0)
+            {
+                BsonDocument bsonListInt = new BsonDocument();
+                for (int i = 0; i < item.ListInt.Count; i++)
+                {
+                    var value = item.ListInt.ItemList[i];
+                    BsonDocument valueDoc = new BsonDocument();
+                    valueDoc["PrevKey"] = value.PrevKey;
+                    valueDoc["Value"] = (BsonValue)value.Value;
+                    bsonListInt[value.Key.ToString()] = valueDoc;
+                }
+                document.Add("ListInt", bsonListInt);
+            }
+
+            if (item.ListStr.Count > 0)
+            {
+                BsonDocument bsonListStr = new BsonDocument();
+                for (int i = 0; i < item.ListStr.Count; i++)
+                {
+                    var value = item.ListStr.ItemList[i];
+                    BsonDocument valueDoc = new BsonDocument();
+                    valueDoc["PrevKey"] = value.PrevKey;
+                    valueDoc["Value"] = (BsonValue)value.Value;
+                    bsonListStr[value.Key.ToString()] = valueDoc;
+                }
+                document.Add("ListStr", bsonListStr);
+            }
+
+            if (item.ListFriend.Count > 0)
+            {
+                BsonDocument bsonListFriend = new BsonDocument();
+                for (int i = 0; i < item.ListFriend.Count; i++)
+                {
+                    var value = item.ListFriend.ItemList[i];
+                    BsonDocument valueDoc = new BsonDocument();
+                    valueDoc["PrevKey"] = value.PrevKey;
+                    valueDoc["Value"] = (BsonValue)value.Value;
+                    bsonListFriend[value.Key.ToString()] = valueDoc;
+                }
+                document.Add("ListFriend", bsonListFriend);
+            }
+            return document;
         }
 
         public static explicit operator Role(BsonValue bsonValue)
         {
-            BsonDocument document = bsonValue.AsBsonDocument;
-            
+            if (bsonValue.IsBsonNull)
+                return null;
+
+            return (Role)bsonValue.AsBsonDocument;
+        }
+
+        public static explicit operator Role(BsonDocument document)
+        {
             Role item = new Role();
-            item.RoleID = (long)document["RoleID"];
-            item._RoleName = (string)document["RoleName"];
-            foreach (var pair in document["Nums"].AsBsonDocument)
+            foreach (var field in document)
             {
-                item.Nums.Add(int.Parse(pair.Name), (int)pair.Value);
-            }
-            foreach (var pair in document["Texts"].AsBsonDocument)
-            {
-                item.Texts.Add(int.Parse(pair.Name), (string)pair.Value);
-            }
-            foreach (var pair in document["Items"].AsBsonDocument)
-            {
-                item.Items.Add(int.Parse(pair.Name), (Item)pair.Value);
-            }
-            foreach (var pair in document["Friends"].AsBsonDocument)
-            {
-                item.Friends.Add(long.Parse(pair.Name), (Friend)pair.Value);
-            }
-            foreach (var pair in document["ListInt"].AsBsonDocument)
-            {
-                BsonDocument valueDoc = pair.Value.AsBsonDocument;
-                int key = int.Parse(pair.Name);
-                int prevKey = (int)valueDoc["PrevKey"];
-                int element = (int)valueDoc["Value"];
-                item.ListInt.ItemList.Add(new BsonListElement<int>(key, prevKey, element));
-            }
-            foreach (var pair in document["ListStr"].AsBsonDocument)
-            {
-                BsonDocument valueDoc = pair.Value.AsBsonDocument;
-                int key = int.Parse(pair.Name);
-                int prevKey = (int)valueDoc["PrevKey"];
-                string element = (string)valueDoc["Value"];
-                item.ListStr.ItemList.Add(new BsonListElement<string>(key, prevKey, element));
-            }
-            foreach (var pair in document["ListFriend"].AsBsonDocument)
-            {
-                BsonDocument valueDoc = pair.Value.AsBsonDocument;
-                int key = int.Parse(pair.Name);
-                int prevKey = (int)valueDoc["PrevKey"];
-                Friend element = (Friend)valueDoc["Value"];
-                item.ListFriend.ItemList.Add(new BsonListElement<Friend>(key, prevKey, element));
+                switch(field.Name)
+                {
+                    case "_id": item.RoleID = (long)field.Value; break;
+                    case "RoleName": item._RoleName = (string)field.Value; break;
+
+                    case "Nums":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                            item.Nums.Add(int.Parse(pair.Name), (int)pair.Value);
+                        break;
+
+                    case "Texts":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                            item.Texts.Add(int.Parse(pair.Name), (string)pair.Value);
+                        break;
+
+                    case "Items":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                            item.Items.Add(int.Parse(pair.Name), (Item)pair.Value);
+                        break;
+
+                    case "DictStr":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                            item.DictStr.Add(pair.Name, (string)pair.Value);
+                        break;
+
+                    case "Friends":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                            item.Friends.Add(long.Parse(pair.Name), (Friend)pair.Value);
+                        break;
+
+                    case "ListInt":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                        {
+                            BsonDocument valueDoc = pair.Value.AsBsonDocument;
+                            int key = int.Parse(pair.Name);
+                            int prevKey = (int)valueDoc["PrevKey"];
+                            int element = (int)valueDoc["Value"];
+                            item.ListInt.Add(new BsonList<int>.Element(key, prevKey, element));
+                        }
+                        item.ListInt.PostDeserialize();
+                        break;
+
+                    case "ListStr":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                        {
+                            BsonDocument valueDoc = pair.Value.AsBsonDocument;
+                            int key = int.Parse(pair.Name);
+                            int prevKey = (int)valueDoc["PrevKey"];
+                            string element = (string)valueDoc["Value"];
+                            item.ListStr.Add(new BsonList<string>.Element(key, prevKey, element));
+                        }
+                        item.ListStr.PostDeserialize();
+                        break;
+
+                    case "ListFriend":
+                        foreach (var pair in field.Value.AsBsonDocument)
+                        {
+                            BsonDocument valueDoc = pair.Value.AsBsonDocument;
+                            int key = int.Parse(pair.Name);
+                            int prevKey = (int)valueDoc["PrevKey"];
+                            Friend element = (Friend)valueDoc["Value"];
+                            item.ListFriend.Add(new BsonList<Friend>.Element(key, prevKey, element));
+                        }
+                        item.ListFriend.PostDeserialize();
+                        break;
+                }
             }
             return item;
         }
 
-        public void Save(string path, MongoSql sql)
+        public void Save(string path, MongoContext context)
         {
             if (_RoleNameDirty)
             {
-                sql.Set.Add($"{path}RoleName", _RoleName);
+                if (default(string) == _RoleName)
+                    context.Unset.Add($"{path}RoleName", 1);       // 如果是默认值则删除该字段,正好解决string==null时的异常
+                else
+                    context.Set.Add($"{path}RoleName", _RoleName);
             }
-            Nums.Foreach(UpdateState.Unset, (key, item, state) =>
+
+            if (0 == Nums.Count && Nums.Removed.Count > 0)
             {
-                sql.Unset.Add($"{path}Nums.{key}", 1);
+                context.Unset.Add($"{path}Nums", 1);
             }
-            Nums.Foreach(UpdateState.Set, (key, item, state) =>
+            else
             {
-                sql.Set.Add($"{path}Nums.{key}", (BsonValue)item);
-            });
-            Texts.Foreach(UpdateState.Unset, (key, item, state) =>
-            {
-                sql.Unset.Add($"{path}Texts.{key}", 1);
-            }
-            Texts.Foreach(UpdateState.Set, (key, item, state) =>
-            {
-                sql.Set.Add($"{path}Texts.{key}", (BsonValue)item);
-            });
-            Items.Foreach(UpdateState.Unset, (key, item, state) =>
-            {
-                sql.Unset.Add($"{path}Items.{key}", 1);
-            }
-            Items.Foreach(UpdateState.None | UpdateState.Set, (key, item, state) =>
-            {
-                if (UpdateState.Set == state)
+                foreach(var key in Nums.Removed)
+                    context.Unset.Add($"{path}Nums.{key}", 1);
+                foreach (var pair in Nums)
                 {
-                    sql.Set.Add($"{path}Items.{key}", (BsonValue)item);
+                    if (Nums.Added.Contains(pair.Key))
+                        context.Set.Add($"{path}Nums.{pair.Key}", (BsonValue)pair.Value);
                 }
-                else if (item.DataDirty)
-                {
-                    item.Save($"{path}Items.{key}.", sql);
-                }
-            });
-            Friends.Foreach(UpdateState.Unset, (key, item, state) =>
-            {
-                sql.Unset.Add($"{path}Friends.{key}", 1);
             }
-            Friends.Foreach(UpdateState.None | UpdateState.Set, (key, item, state) =>
+
+            if (0 == Texts.Count && Texts.Removed.Count > 0)
             {
-                if (UpdateState.Set == state)
-                {
-                    sql.Set.Add($"{path}Friends.{key}", (BsonValue)item);
-                }
-                else if (item.DataDirty)
-                {
-                    item.Save($"{path}Friends.{key}.", sql);
-                }
-            });
-            for (int i = 0; i < ListInt.Count; i++)
+                context.Unset.Add($"{path}Texts", 1);
+            }
+            else
             {
-                if (ListInt.IsModifyed(i))
+                foreach(var key in Texts.Removed)
+                    context.Unset.Add($"{path}Texts.{key}", 1);
+                foreach (var pair in Texts)
                 {
-                    sql.Set.Add($"{path}ListInt.{ListInt.ItemList[i].Key}", (BsonValue)ListInt[i]);
+                    if (Texts.Added.Contains(pair.Key))
+                        context.Set.Add($"{path}Texts.{pair.Key}", (BsonValue)pair.Value);
+                }
+            }
+
+            if (0 == Items.Count && Items.Removed.Count > 0)
+            {
+                context.Unset.Add($"{path}Items", 1);
+            }
+            else
+            {
+                foreach(var key in Items.Removed)
+                    context.Unset.Add($"{path}Items.{key}", 1);
+                foreach (var pair in Items)
+                {
+                    if (Items.Added.Contains(pair.Key))
+                        context.Set.Add($"{path}Items.{pair.Key}", (BsonValue)pair.Value);
+                    else if (null != pair.Value)
+                        pair.Value.Save($"{path}Items.{pair.Key}.", context);
+                }
+            }
+
+            if (0 == DictStr.Count && DictStr.Removed.Count > 0)
+            {
+                context.Unset.Add($"{path}DictStr", 1);
+            }
+            else
+            {
+                foreach(var key in DictStr.Removed)
+                    context.Unset.Add($"{path}DictStr.{key}", 1);
+                foreach (var pair in DictStr)
+                {
+                    if (DictStr.Added.Contains(pair.Key))
+                        context.Set.Add($"{path}DictStr.{pair.Key}", (BsonValue)pair.Value);
+                }
+            }
+
+            if (0 == Friends.Count && Friends.Removed.Count > 0)
+            {
+                context.Unset.Add($"{path}Friends", 1);
+            }
+            else
+            {
+                foreach(var key in Friends.Removed)
+                    context.Unset.Add($"{path}Friends.{key}", 1);
+                foreach (var pair in Friends)
+                {
+                    if (Friends.Added.Contains(pair.Key))
+                        context.Set.Add($"{path}Friends.{pair.Key}", (BsonValue)pair.Value);
+                    else if (null != pair.Value)
+                        pair.Value.Save($"{path}Friends.{pair.Key}.", context);
+                }
+            }
+
+            if (0 == ListInt.Count && ListInt.Removed.Count > 0)
+            {
+                context.Unset.Add($"{path}ListInt", 1);
+            }
+            else
+            {
+                foreach (var key in ListInt.Removed)
+                {
+                    context.Unset.Add($"{path}ListInt.{key}", 1);
+                }
+                foreach (var element in ListInt.ItemList)
+                {
+                    if (element.NewData)
+                    {
+                        BsonDocument valueDoc = new BsonDocument();
+                        valueDoc["PrevKey"] = element.PrevKey;
+                        valueDoc["Value"] = (BsonValue)element.Value;
+                        context.Set.Add($"{path}ListInt.{element.Key}", valueDoc);
+                    }
+                    else
+                    {
+                        if (element.PrevKeyDirty)
+                            context.Set.Add($"{path}ListInt.{element.Key}.PrevKey", element.PrevKey);
+
+                        if (element.ValueDirty)
+                            context.Set.Add($"{path}ListInt.{element.Key}.Value", (BsonValue)element.Value);
+                    }
                 }
             }
             
-            for (int i = 0; i < ListStr.Count; i++)
+
+            if (0 == ListStr.Count && ListStr.Removed.Count > 0)
             {
-                if (ListStr.IsModifyed(i))
+                context.Unset.Add($"{path}ListStr", 1);
+            }
+            else
+            {
+                foreach (var key in ListStr.Removed)
                 {
-                    sql.Set.Add($"{path}ListStr.{ListStr.ItemList[i].Key}", (BsonValue)ListStr[i]);
+                    context.Unset.Add($"{path}ListStr.{key}", 1);
+                }
+                foreach (var element in ListStr.ItemList)
+                {
+                    if (element.NewData)
+                    {
+                        BsonDocument valueDoc = new BsonDocument();
+                        valueDoc["PrevKey"] = element.PrevKey;
+                        valueDoc["Value"] = (BsonValue)element.Value;
+                        context.Set.Add($"{path}ListStr.{element.Key}", valueDoc);
+                    }
+                    else
+                    {
+                        if (element.PrevKeyDirty)
+                            context.Set.Add($"{path}ListStr.{element.Key}.PrevKey", element.PrevKey);
+
+                        if (element.ValueDirty)
+                            context.Set.Add($"{path}ListStr.{element.Key}.Value", (BsonValue)element.Value);
+                    }
                 }
             }
             
-            for (int i = 0; i < ListFriend.Count; i++)
+
+            if (0 == ListFriend.Count && ListFriend.Removed.Count > 0)
             {
-                if (ListFriend.IsModifyed(i))
+                context.Unset.Add($"{path}ListFriend", 1);
+            }
+            else
+            {
+                foreach (var key in ListFriend.Removed)
                 {
-                    sql.Set.Add($"{path}ListFriend.{ListFriend.ItemList[i].Key}", (BsonValue)ListFriend[i]);
+                    context.Unset.Add($"{path}ListFriend.{key}", 1);
+                }
+                foreach (var element in ListFriend.ItemList)
+                {
+                    if (element.NewData)
+                    {
+                        BsonDocument valueDoc = new BsonDocument();
+                        valueDoc["PrevKey"] = element.PrevKey;
+                        valueDoc["Value"] = (BsonValue)element.Value;
+                        context.Set.Add($"{path}ListFriend.{element.Key}", valueDoc);
+                    }
+                    else
+                    {
+                        if (element.PrevKeyDirty)
+                            context.Set.Add($"{path}ListFriend.{element.Key}.PrevKey", element.PrevKey);
+
+                        if (element.ValueDirty)
+                            context.Set.Add($"{path}ListFriend.{element.Key}.Value", (BsonValue)element.Value);
+                        else if (null != element.Value)
+                            element.Value.Save($"{path}ListFriend.{element.Key}.Value.", context);
+                    }
                 }
             }
             

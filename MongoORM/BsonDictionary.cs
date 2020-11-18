@@ -1,28 +1,41 @@
 ﻿using MongoDB.Bson;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Test
 {
-    public class BsonDictionary<TKey, TValue> 
+    public class BsonDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     {
-        private Dictionary<TKey, UpdateState> States = new Dictionary<TKey, UpdateState>();
-        private Dictionary<TKey, TValue> Items = new Dictionary<TKey, TValue>();
+        internal Dictionary<TKey, TValue> Items = new Dictionary<TKey, TValue>();
+        internal HashSet<TKey> Added = new HashSet<TKey>();
+        internal HashSet<TKey> Removed = new HashSet<TKey>();
 
-        public int Count { get; protected set; }
+        public int Count { get => Items.Count; }
 
-        public void ClearState()
+        public ICollection<TKey> Keys => Items.Keys;
+
+        public ICollection<TValue> Values => Items.Values;
+
+        public bool IsReadOnly => false;
+
+        internal void ClearDirty()
         {
-            States.Clear();
-            Count = Items.Count;
+            Added.Clear();
+            Removed.Clear();
         }
 
         public void Clear()
         {
-            States.Clear();
+            foreach (var pair in Items)
+            {
+                if (!Added.Contains(pair.Key))
+                    Removed.Add(pair.Key);
+            }
+
+            Added.Clear();
             Items.Clear();
-            Count = 0;
         }
 
         public TValue this[TKey key]
@@ -33,11 +46,8 @@ namespace Test
             }
             set
             {
-                if (!Items.ContainsKey(key))
-                    Count++;
-
                 Items[key] = value;
-                States[key] = UpdateState.Set;
+                Added.Add(key);
             }
         }
 
@@ -46,26 +56,11 @@ namespace Test
             return Items.TryGetValue(key, out value);
         }
 
-        public bool TryGetValue(TKey key, out TValue value, out UpdateState state)
+        public void Add(TKey key, TValue value)
         {
-            States.TryGetValue(key, out state);
-            return Items.TryGetValue(key, out value);
-        }
-
-        public void Add(TKey key, TValue value, bool dbReplicated = false)
-        {
-            if (!Items.ContainsKey(key))
-                Count++;
-
             Items[key] = value;
-            if (dbReplicated)
-            {
-                States[key] = UpdateState.Set;
-            }
-            else
-            {
-                States.Remove(key);
-            }
+            Added.Add(key);
+
         }
 
         public bool Remove(TKey key)
@@ -73,63 +68,88 @@ namespace Test
             if (!Items.TryGetValue(key, out TValue value))
                 return false;
 
-            Count--;
-            if (!States.TryGetValue(key, out UpdateState state))
-                state = UpdateState.None;
+            bool newData = Added.Contains(key);
 
-            if (UpdateState.Set == state)
+            Items.Remove(key);     
+            if (newData)
             {
-                States.Remove(key);
-                Items.Remove(key);
-            }
-            else if (UpdateState.None == state)
-            {
-                States[key] = UpdateState.Unset;
-            }
-            return true;
-        }
-
-        public void Foreach(UpdateState filter, Action<TKey, TValue, UpdateState> action)
-        {
-            foreach (var pair in Items)
-            {
-                if (!States.TryGetValue(pair.Key, out UpdateState state))
-                    state = UpdateState.None;
-
-                if ((filter & state) != 0)
-                    action(pair.Key, pair.Value, state);
-            }
-        }
-
-        public void SetState(TKey key, UpdateState state)
-        {
-            if (!Items.ContainsKey(key))
-                return;
-
-            if (!States.TryGetValue(key, out UpdateState oldState))
-                oldState = UpdateState.None;
-
-            if (state == oldState) return;
-
-            if (UpdateState.Set == oldState && UpdateState.Unset == state)
-            {
-                States.Remove(key);
-                Items.Remove(key);
-                Count--;
-            }
-            else if (UpdateState.None == oldState && UpdateState.Unset == state)
-            {
-                States[key] = state;
-                Count--;
-            }
-            else if (UpdateState.Unset == oldState)
-            {
-                States[key] = state;
-                Count++;
+                Added.Remove(key);
             }
             else
             {
-                States[key] = state;
+                Removed.Add(key);
+            }
+
+            return true;
+        }
+
+        public bool ContainsKey(TKey key)
+        {
+            return Items.ContainsKey(key);
+        }
+
+        void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item)
+        {
+            throw new NotImplementedException();
+        }
+
+        bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item)
+        {
+            throw new NotImplementedException();
+        }
+
+        void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>, IDictionaryEnumerator
+        {
+            IEnumerator<KeyValuePair<TKey, TValue>> _Enumerator;
+
+            public Enumerator(BsonDictionary<TKey, TValue> list)
+            {
+                _Enumerator = list.Items.GetEnumerator();
+            }
+
+            public KeyValuePair<TKey, TValue> Current => _Enumerator.Current;
+
+            public DictionaryEntry Entry => new DictionaryEntry(_Enumerator.Current.Key, _Enumerator.Current.Value);
+
+            public object Key => _Enumerator.Current.Key;
+
+            public object Value => _Enumerator.Current.Value;
+
+            object IEnumerator.Current => _Enumerator.Current;
+
+            public void Dispose()
+            {
+                _Enumerator.Dispose();
+            }
+
+            public bool MoveNext()
+            {
+                return _Enumerator.MoveNext();
+            }
+
+            public void Reset()
+            {
+                _Enumerator.Reset();
             }
         }
     }
