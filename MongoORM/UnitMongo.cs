@@ -678,6 +678,61 @@ namespace Test
             update.Clear();
             context.Clear();
         }
+
+        [Test]
+        public void TestUpdateVsReplace()
+        {
+            var collection = GetTestCollection<BsonDocument>();
+            BulkWriteContext context = new BulkWriteContext();
+
+            Dictionary<long, Role> Roles = new Dictionary<long, Role>();
+            for (int i = 0; i < 100; i++)
+            {
+                var role = new Role { RoleID = i, RoleName = i.ToString() };
+                for (int itemIndex = 0; itemIndex < 50; itemIndex++)
+                    role.Items.Add(itemIndex, new Item { ItemID = itemIndex, ItemUID = itemIndex });
+                role.ClearDirty();
+                Roles.Add(i, role);
+                context.Insert((BsonDocument)role);
+            }
+            context.Execute(collection);
+            context.Clear();
+
+            Stopwatch watch = new Stopwatch();
+
+            List<ReplaceOneModel<BsonDocument>> replaces = new List<ReplaceOneModel<BsonDocument>>();
+            watch.Start();
+            foreach (var pair in Roles)
+                replaces.Add(new ReplaceOneModel<BsonDocument>(new BsonDocument { { "_id", pair.Key } }, (BsonDocument)pair.Value));
+            collection.BulkWrite(replaces);
+            watch.Stop();
+            var time1 = watch.ElapsedMilliseconds;
+
+            watch.Reset();
+
+            for (int i = 0; i < 100; i++)
+            {
+                Roles[i].RoleName += i;
+                for (int itemIndex = 0; itemIndex < 10; itemIndex++)
+                    Roles[i].Items[itemIndex].ItemID += 1;
+                Roles[i].Items.Add(51, new Item { ItemID = 51, ItemUID = 51 });
+            }
+
+            UpdateContext update = new UpdateContext();
+            watch.Start();
+            foreach (var pair in Roles)
+            {
+                update.Clear();
+                pair.Value.Update(update);
+                context.Update(new BsonDocument { { "_id", pair.Key } }, update.Build());
+            }
+            context.Execute(collection);
+            context.Clear();
+            watch.Stop();
+            var time2 = watch.ElapsedMilliseconds;
+
+            Assert.IsTrue(time1 > time2);
+        }
     }
 
     public partial class Role
